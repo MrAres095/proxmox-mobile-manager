@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
 private val api = ProxmoxApi()
+private val console = ProxmoxConsole()
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,6 +32,7 @@ fun ProxmoxApp() {
     MaterialTheme(colorScheme = darkColorScheme()) {
         Surface(modifier = Modifier.fillMaxSize()) {
             var showSettings by remember { mutableStateOf(true) }
+            var consoleVm by remember { mutableStateOf<ProxmoxVm?>(null) }
             var connectedBase by remember { mutableStateOf<String?>(null) }
             var nodes by remember { mutableStateOf<List<ProxmoxNode>>(emptyList()) }
             var vms by remember { mutableStateOf<List<ProxmoxVm>>(emptyList()) }
@@ -43,7 +45,7 @@ fun ProxmoxApp() {
             var connection by remember { mutableStateOf(ProxmoxConnection(prefs.getString("localUrl", "") ?: "", prefs.getString("remoteUrl", "") ?: "", prefs.getString("tokenId", "") ?: "", prefs.getString("tokenSecret", "") ?: "")) }
             val scope = rememberCoroutineScope()
 
-            if (showSettings || connectedBase == null) {
+            if (consoleVm != null && connectedBase != null) { ConsoleScreen(connectedBase!!, connection, consoleVm!!, { console.close(); consoleVm=null }) } else if (showSettings || connectedBase == null) {
                 ConnectionScreen(connection, loading, error) { newConnection ->
                     connection = newConnection
                     prefs.edit().putString("localUrl", newConnection.localUrl).putString("remoteUrl", newConnection.remoteUrl).putString("tokenId", newConnection.tokenId).putString("tokenSecret", newConnection.tokenSecret).apply()
@@ -108,6 +110,7 @@ fun ProxmoxApp() {
                         }
                     },
                     onSettings = { showSettings = true },
+                    onConsole = { consoleVm = it },
                     error = error
                 )
             }
@@ -188,6 +191,7 @@ private fun Dashboard(
     onVmAction: (ProxmoxVm, VmAction) -> Unit,
     onRefresh: () -> Unit,
     onSettings: () -> Unit,
+    onConsole: (ProxmoxVm) -> Unit,
     error: String?
 ) {
     val context = LocalContext.current
@@ -283,7 +287,7 @@ private fun Dashboard(
                 item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() } }
             }
             items(vms, key = { it.node + "-" + it.type + "-" + it.vmid }) { vm ->
-                VmCard(vm, vmLoading, onVmAction)
+                VmCard(vm, vmLoading, onVmAction, onConsole)
             }
             if (!vmLoading && vms.isEmpty()) item { Text("Nema pronađenih VM/LXC resursa.") }
 
@@ -323,7 +327,7 @@ private fun Dashboard(
 
 
 @Composable
-private fun VmCard(vm: ProxmoxVm, busy: Boolean, onAction: (ProxmoxVm, VmAction) -> Unit) {
+private fun VmCard(vm: ProxmoxVm, busy: Boolean, onAction: (ProxmoxVm, VmAction) -> Unit, onConsole: (ProxmoxVm) -> Unit) {
     var confirmAction by remember { mutableStateOf<VmAction?>(null) }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
@@ -339,6 +343,8 @@ private fun VmCard(vm: ProxmoxVm, busy: Boolean, onAction: (ProxmoxVm, VmAction)
             Text("CPU: " + "%.1f".format(vm.cpu * 100) + "%")
             if (vm.maxDisk > 0) Text("Disk: " + formatBytes(vm.maxDisk))
             Spacer(Modifier.height(12.dp))
+            OutlinedButton({ onConsole(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()){ Icon(Icons.Default.Terminal,null); Spacer(Modifier.width(4.dp)); Text("Console") }
+            Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (vm.isRunning) {
                     OutlinedButton({ confirmAction = VmAction.REBOOT }, enabled = !busy, modifier = Modifier.weight(1f)) {
@@ -400,3 +406,11 @@ private fun formatBytes(value: Long): String {
     while (v >= 1024 && i < units.lastIndex) { v /= 1024; i++ }
     return "${"%.1f".format(v)} ${units[i]}"
 }
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,onBack:()->Unit){
+ val scope=rememberCoroutineScope(); var output by remember{mutableStateOf("Spajanje na Proxmox konzolu...\n")}; var input by remember{mutableStateOf("")}; var connected by remember{mutableStateOf(false)}; var error by remember{mutableStateOf<String?>(null)}
+ DisposableEffect(vm){ scope.launch{try{console.open(base,connection,vm,{b->val t=String(b,Charsets.UTF_8);if(t=="OK")connected=true else output=(output+t).takeLast(30000)},{reason->connected=false;output+="\n[Veza zatvorena"+(reason?.let{": "+it}?: "")+"]\n"},{e->connected=false;error=e.message?:"Greška konzole"})}catch(e:Exception){error=e.message?:"Spajanje na konzolu nije uspjelo."}};onDispose{console.close()} }
+ Scaffold(topBar={TopAppBar(title={Text(vm.name+" • Console")},navigationIcon={IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,"Natrag")}},actions={Text(if(connected)"● LIVE" else "○ povezivanje",Modifier.padding(end=12.dp))})}){p->Column(Modifier.fillMaxSize().padding(p).padding(8.dp)){Surface(Modifier.fillMaxWidth().weight(1f)){Text(output,Modifier.fillMaxSize().padding(8.dp),style=MaterialTheme.typography.bodySmall)};if(error!=null)Text(error!!,color=MaterialTheme.colorScheme.error);Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){OutlinedTextField(input,{input=it},Modifier.weight(1f),label={Text("Unos")},singleLine=true,enabled=connected);Spacer(Modifier.width(6.dp));Button({console.send(input+"\n");input=""},enabled=connected&&input.isNotEmpty()){Text("Pošalji")}};Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){TextButton({console.send("\u0003")},enabled=connected){Text("Ctrl+C")};TextButton({console.send("\u0004")},enabled=connected){Text("Ctrl+D")};TextButton({console.send("\t")},enabled=connected){Text("Tab")};TextButton({console.send("\u001b[A")},enabled=connected){Text("↑")};TextButton({console.send("\u001b[B")},enabled=connected){Text("↓")}}}}}
