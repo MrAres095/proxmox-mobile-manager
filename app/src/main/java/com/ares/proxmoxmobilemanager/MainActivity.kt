@@ -155,7 +155,7 @@ private fun ConnectionScreen(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !loading && (local.isNotBlank() || remote.isNotBlank()),
                 onClick = {
-                    val endpoint = if (local.startsWith("http://") || local.startsWith("https://")) local.trimEnd('/') else "https://" + local.trim().trimEnd('/') + ":" + localPort.ifBlank { "8006" }
+                    val endpoint = if (local.isBlank()) "" else if (local.startsWith("http://") || local.startsWith("https://")) local.trimEnd('/') else "https://" + local.trim().trimEnd('/') + ":" + localPort.ifBlank { "8006" }
                     onConnect(ProxmoxConnection(endpoint, remote.trim().trimEnd('/'), tokenId.trim(), secret.trim()))
                 }
             ) {
