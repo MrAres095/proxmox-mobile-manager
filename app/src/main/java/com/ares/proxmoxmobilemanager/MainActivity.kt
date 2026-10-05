@@ -28,6 +28,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,7 +72,7 @@ fun ProxmoxApp() {
                         scope.launch {
                             try {
                                 val base = api.findReachableBase(newConnection)
-                                    ?: error("Nijedan Proxmox URL nije dostupan.")
+                                    ?: throw IllegalStateException("Nijedan Proxmox URL nije dostupan.")
                                 if (base != null) {
                                     connectedBase = base
                                     nodes = api.getNodes(base, newConnection)
@@ -111,6 +112,7 @@ fun ProxmoxApp() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ConnectionScreen(
     initial: ProxmoxConnection,
@@ -167,6 +169,7 @@ private fun ConnectionScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Dashboard(
     base: String,
