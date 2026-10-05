@@ -40,6 +40,8 @@ fun ProxmoxApp() {
             var vmLoading by remember { mutableStateOf(false) }
             var loading by remember { mutableStateOf(false) }
             var error by remember { mutableStateOf<String?>(null) }
+            var updatingAll by remember { mutableStateOf(false) }
+            var updateStatuses by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
             val context = LocalContext.current
             val prefs = remember { context.getSharedPreferences("proxmox_connection", Context.MODE_PRIVATE) }
             var connection by remember { mutableStateOf(ProxmoxConnection(prefs.getString("localUrl", "") ?: "", prefs.getString("remoteUrl", "") ?: "", prefs.getString("tokenId", "") ?: "", prefs.getString("tokenSecret", "") ?: "")) }
@@ -192,6 +194,9 @@ private fun Dashboard(
     onRefresh: () -> Unit,
     onSettings: () -> Unit,
     onConsole: (ProxmoxVm) -> Unit,
+    onUpdateAll: () -> Unit,
+    updateAllBusy: Boolean,
+    updateStatuses: Map<String, String>,
     error: String?
 ) {
     val context = LocalContext.current
