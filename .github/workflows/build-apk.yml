@@ -31,8 +31,21 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > app/proxmox-release.jks
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > app/proxmox-release.jks
           chmod 600 app/proxmox-release.jks
+          test -s app/proxmox-release.jks
+
+      - name: Verify release keystore
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          keytool -list \
+            -keystore app/proxmox-release.jks \
+            -storetype PKCS12 \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS" >/dev/null
+          echo "Keystore and alias are valid."
 
       - name: Build signed release APK
         env:
@@ -40,7 +53,14 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          gradle :app:assembleRelease             -PAPP_VERSION_CODE="${{ github.run_number }}"             -PAPP_VERSION_NAME="0.1.${{ github.run_number }}"             --no-daemon
+          gradle :app:assembleRelease \
+            -PAPP_VERSION_CODE="${{ github.run_number }}" \
+            -PAPP_VERSION_NAME="0.1.${{ github.run_number }}" \
+            --no-daemon
+
+      - name: Verify APK signature
+        run: |
+          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose app/build/outputs/apk/release/app-release.apk
 
       - name: Prepare release APK
         run: |
@@ -51,4 +71,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: v0.1.${{ github.run_number }}
         run: |
-          gh release create "$TAG_NAME" proxmox-mobile-manager.apk             --title "Proxmox Mobile Manager $TAG_NAME"             --generate-notes
+          gh release create "$TAG_NAME" proxmox-mobile-manager.apk \
+            --title "Proxmox Mobile Manager $TAG_NAME" \
+            --generate-notes
