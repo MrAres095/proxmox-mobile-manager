@@ -1,13 +1,17 @@
-name: Build APK
+name: Build and Release APK
 
 on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -16,18 +20,35 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.11.1'
+          gradle-version: "8.11.1"
 
-      - name: Build debug APK
-        run: gradle :app:assembleDebug --no-daemon
+      - name: Restore release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > app/proxmox-release.jks
+          chmod 600 app/proxmox-release.jks
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: proxmox-mobile-manager-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Build signed release APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          gradle :app:assembleRelease             -PAPP_VERSION_CODE="${{ github.run_number }}"             -PAPP_VERSION_NAME="0.1.${{ github.run_number }}"             --no-daemon
+
+      - name: Prepare release APK
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk proxmox-mobile-manager.apk
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: v0.1.${{ github.run_number }}
+        run: |
+          gh release create "$TAG_NAME" proxmox-mobile-manager.apk             --title "Proxmox Mobile Manager $TAG_NAME"             --generate-notes
