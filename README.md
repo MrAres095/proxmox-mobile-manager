@@ -1,21 +1,13 @@
 # Proxmox Mobile Manager
 
-Native Android application for managing Proxmox VE servers.
+Native Android app for managing Proxmox VE servers.
 
-## Current MVP
-- Native Android UI with dark theme
+## MVP
+- Dark native Android UI
 - Proxmox API token connection
-- Local-first / remote fallback connection
-- Secure connection settings foundation
-- Node listing
+- Local-first / remote fallback
+- Node dashboard
+- GitHub Actions debug APK build
 
-## Planned
-- Nodes, VMs and LXC management
-- Storage, network and firewall
-- Tasks, logs, snapshots and backups
-- HA/cluster management
-- Persistent interactive terminal sessions
-- Console with keyboard, copy/paste and fullscreen mode
-- GitHub Actions APK builds and releases
-
-Repository: https://github.com/MrAres095/proxmox-mobile-manager
+## Roadmap
+VM/LXC controls, storage, network, firewall, backups, snapshots, tasks/logs, HA/cluster and persistent terminal console.
