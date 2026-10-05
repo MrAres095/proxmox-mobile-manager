@@ -57,6 +57,22 @@ class ProxmoxApi {
         return null
     }
 
+    suspend fun getServerIdentity(base: String, connection: ProxmoxConnection): String =
+        withContext(Dispatchers.IO) {
+            try {
+                val json = request(base, "/api2/json/cluster/status", connection, 7000)
+                val data = json.optJSONArray("data")
+                if (data != null && data.length() > 0) {
+                    return@withContext (0 until data.length()).map { i ->
+                        val item = data.getJSONObject(i)
+                        listOf(item.optString("type"), item.optString("name"), item.optString("id")).joinToString(":")
+                    }.sorted().joinToString("|")
+                }
+            } catch (_: Exception) { }
+            val nodes = getNodes(base, connection)
+            nodes.map { it.node + ":" + it.maxCpu }.sorted().joinToString("|")
+        }
+
     suspend fun getNodes(base: String, connection: ProxmoxConnection): List<ProxmoxNode> =
         withContext(Dispatchers.IO) {
             val json = request(base, "/api2/json/nodes", connection, 7000)
