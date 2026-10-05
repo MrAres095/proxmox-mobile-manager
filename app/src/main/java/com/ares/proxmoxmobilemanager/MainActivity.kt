@@ -113,6 +113,25 @@ fun ProxmoxApp() {
                     },
                     onSettings = { showSettings = true },
                     onConsole = { consoleVm = it },
+                    onUpdateAll = {
+                        if (!updatingAll) {
+                            updatingAll = true
+                            updateStatuses = nodes.associate { it.node to "Čeka" }
+                            scope.launch {
+                                try {
+                                    for (node in nodes) {
+                                        updateStatuses = updateStatuses + (node.node to "Ažuriranje...")
+                                        val result = console.upgradeNode(connectedBase!!, connection, node) { _ -> }
+                                        updateStatuses = updateStatuses + (node.node to if (result.isSuccess) "Gotovo" else "Greška")
+                                    }
+                                } finally {
+                                    updatingAll = false
+                                }
+                            }
+                        }
+                    },
+                    updateAllBusy = updatingAll,
+                    updateStatuses = updateStatuses,
                     error = error
                 )
             }
@@ -286,6 +305,30 @@ private fun Dashboard(
                 item { Text("Aplikacija je ažurna.", style = MaterialTheme.typography.bodySmall) }
             }
 
+
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.SystemUpdate, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Proxmox serveri", style = MaterialTheme.typography.titleLarge)
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text("Ažurira sve nodeove jedan po jedan preko službene Proxmox nadogradnje.")
+                        Spacer(Modifier.height(10.dp))
+                        Button(onClick = onUpdateAll, enabled = !updateAllBusy && nodes.isNotEmpty(), modifier = Modifier.fillMaxWidth()) {
+                            if (updateAllBusy) CircularProgressIndicator(modifier = Modifier.height(20.dp))
+                            else Icon(Icons.Default.SystemUpdate, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text(if (updateAllBusy) "Ažuriranje u tijeku..." else "Update svi serveri")
+                        }
+                        updateStatuses.forEach { (node, status) ->
+                            Text(node + ": " + status, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
 
             item { Text("Virtualne mašine i LXC", style = MaterialTheme.typography.headlineSmall) }
             if (vmLoading && vms.isEmpty()) {
