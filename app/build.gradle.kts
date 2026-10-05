@@ -4,6 +4,15 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val releaseVersionCode = providers.gradleProperty("APP_VERSION_CODE")
+    .orNull
+    ?.toIntOrNull()
+    ?: 1
+
+val releaseVersionName = providers.gradleProperty("APP_VERSION_NAME")
+    .orNull
+    ?: "0.1.0"
+
 android {
     namespace = "com.ares.proxmoxmobilemanager"
     compileSdk = 35
@@ -12,13 +21,25 @@ android {
         applicationId = "com.ares.proxmoxmobilemanager"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = releaseVersionCode
+        versionName = releaseVersionName
+    }
+
+    signingConfigs {
+        create("release") {
+            val keystoreFile = file("proxmox-release.jks")
+            storeFile = keystoreFile
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
+            keyAlias = System.getenv("KEY_ALIAS") ?: "proxmox-release"
+            keyPassword = System.getenv("KEY_PASSWORD") ?: ""
+            storeType = "PKCS12"
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
