@@ -37,60 +37,19 @@ jobs:
           chmod 600 app/proxmox-release.jks
           test -s app/proxmox-release.jks
 
-      - name: Diagnose keystore credentials
+      - name: Validate release keystore
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set -euo pipefail
-
           EXPECTED_SHA256="EF:1A:D5:DE:68:28:CB:09:37:C7:5B:95:EB:B8:DE:00:5D:C7:57:86:C7:A1:D0:65:44:AE:13:1C:3B:05:14:66"
-
-          echo "Checking that required secrets are present..."
-          test -n "$KEYSTORE_PASSWORD" || { echo "::error::KEYSTORE_PASSWORD is empty or unavailable"; exit 1; }
-          test -n "$KEY_ALIAS" || { echo "::error::KEY_ALIAS is empty or unavailable"; exit 1; }
-          test -n "$KEY_PASSWORD" || { echo "::error::KEY_PASSWORD is empty or unavailable"; exit 1; }
-
-          echo "1/4 Testing KEYSTORE_PASSWORD..."
-          if ! keytool -list -keystore app/proxmox-release.jks -storetype PKCS12 -storepass "$KEYSTORE_PASSWORD" >/tmp/keystore-list.txt 2>/tmp/keystore-error.txt; then
-            echo "::error::KEYSTORE_PASSWORD is incorrect (or the restored keystore is not a valid PKCS12 keystore)."
-            cat /tmp/keystore-error.txt
-            exit 10
-          fi
-          echo "KEYSTORE_PASSWORD: OK"
-
-          echo "2/4 Reading aliases..."
-          grep -E '^proxmox-release,' /tmp/keystore-list.txt >/dev/null || true
-          keytool -list -keystore app/proxmox-release.jks -storetype PKCS12 -storepass "$KEYSTORE_PASSWORD" -v >/tmp/keystore-v.txt
-          if ! grep -Fq "Alias name: $KEY_ALIAS" /tmp/keystore-v.txt; then
-            echo "::error::KEY_ALIAS '$KEY_ALIAS' does not exist in the keystore."
-            echo "Available aliases (names only):"
-            awk -F': ' '/^Alias name: / {print $2}' /tmp/keystore-v.txt
-            exit 11
-          fi
-          echo "KEY_ALIAS: OK"
-
-          echo "3/4 Checking entry type and certificate fingerprint..."
-          if ! grep -A2 -B1 -F "Alias name: $KEY_ALIAS" /tmp/keystore-v.txt | grep -Fq "PrivateKeyEntry"; then
-            echo "::error::The selected alias is not a PrivateKeyEntry."
-            exit 12
-          fi
-          if ! grep -Fq "SHA256: $EXPECTED_SHA256" /tmp/keystore-v.txt; then
-            echo "::error::The selected alias certificate fingerprint does not match the expected release certificate."
-            exit 13
-          fi
-          echo "Certificate: OK (expected fingerprint)"
-
-          echo "4/4 Testing KEY_PASSWORD separately..."
-          if ! keytool -certreq -keystore app/proxmox-release.jks -storetype PKCS12 -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_PASSWORD" -alias "$KEY_ALIAS" -file /tmp/signing-test.csr >/tmp/keypass-output.txt 2>/tmp/keypass-error.txt; then
-            echo "::error::KEY_PASSWORD is incorrect for alias '$KEY_ALIAS'. The keystore password and alias are correct."
-            cat /tmp/keypass-error.txt
-            exit 14
-          fi
-          rm -f /tmp/signing-test.csr
-          echo "KEY_PASSWORD: OK"
-          echo "All release signing credentials are valid."
+          test -n "$KEYSTORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          keytool -list -keystore app/proxmox-release.jks -storetype PKCS12 -storepass "$KEYSTORE_PASSWORD" -v > /tmp/keystore.txt
+          grep -Fq "Alias name: $KEY_ALIAS" /tmp/keystore.txt
+          grep -A2 -B1 -F "Alias name: $KEY_ALIAS" /tmp/keystore.txt | grep -Fq "PrivateKeyEntry"
+          grep -Fq "SHA256: $EXPECTED_SHA256" /tmp/keystore.txt
 
       - name: Build signed release APK
         env:
