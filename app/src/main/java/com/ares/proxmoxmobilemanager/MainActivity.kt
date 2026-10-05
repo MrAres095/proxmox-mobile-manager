@@ -34,6 +34,7 @@ fun ProxmoxApp() {
             var connectedBase by remember { mutableStateOf<String?>(null) }
             var nodes by remember { mutableStateOf<List<ProxmoxNode>>(emptyList()) }
             var vms by remember { mutableStateOf<List<ProxmoxVm>>(emptyList()) }
+            var storage by remember { mutableStateOf<List<ProxmoxStorage>>(emptyList()) }
             var vmLoading by remember { mutableStateOf(false) }
             var loading by remember { mutableStateOf(false) }
             var error by remember { mutableStateOf<String?>(null) }
@@ -67,6 +68,7 @@ fun ProxmoxApp() {
                     base = connectedBase!!,
                     nodes = nodes,
                     vms = vms,
+                    storage = storage,
                     loading = loading,
                     vmLoading = vmLoading,
                     onVmAction = { vm, action ->
@@ -77,8 +79,11 @@ fun ProxmoxApp() {
                                     VmAction.START -> api.startVm(connectedBase!!, connection, vm)
                                     VmAction.STOP -> api.stopVm(connectedBase!!, connection, vm)
                                     VmAction.REBOOT -> api.rebootVm(connectedBase!!, connection, vm)
+                                    VmAction.SHUTDOWN -> api.shutdownVm(connectedBase!!, connection, vm)
+                                    VmAction.RESET -> api.resetVm(connectedBase!!, connection, vm)
                                 }
                                 vms = api.getVms(connectedBase!!, connection)
+                                storage = api.getStorage(connectedBase!!, connection)
                                 error = null
                             } catch (e: Exception) {
                                 error = e.message ?: "Radnja nije uspjela."
@@ -93,6 +98,7 @@ fun ProxmoxApp() {
                             try {
                                 nodes = api.getNodes(connectedBase!!, connection)
                                 vms = api.getVms(connectedBase!!, connection)
+                                storage = api.getStorage(connectedBase!!, connection)
                                 error = null
                             } catch (e: Exception) {
                                 error = e.message ?: "Greška."
@@ -176,6 +182,7 @@ private fun Dashboard(
     base: String,
     nodes: List<ProxmoxNode>,
     vms: List<ProxmoxVm>,
+    storage: List<ProxmoxStorage>,
     loading: Boolean,
     vmLoading: Boolean,
     onVmAction: (ProxmoxVm, VmAction) -> Unit,
@@ -299,6 +306,17 @@ private fun Dashboard(
                 }
             }
             if (!loading && nodes.isEmpty()) item { Text("Nema pronađenih nodeova.") }
+            item { Text("Storage", style = MaterialTheme.typography.headlineSmall) }
+            items(storage, key = { it.node + "-" + it.storage }) { s ->
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(s.storage, style = MaterialTheme.typography.titleMedium)
+                        Text("${s.node} • ${s.type} • ${if (s.active) "active" else "inactive"}")
+                        Text("Prostor: ${formatBytes(s.used)} / ${formatBytes(s.total)}")
+                        Text("Slobodno: ${formatBytes(s.avail)}")
+                    }
+                }
+            }
         }
     }
 }
@@ -328,6 +346,11 @@ private fun VmCard(vm: ProxmoxVm, busy: Boolean, onAction: (ProxmoxVm, VmAction)
                         Spacer(Modifier.width(4.dp))
                         Text("Restart")
                     }
+                    OutlinedButton({ confirmAction = VmAction.SHUTDOWN }, enabled = !busy, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.PowerSettingsNew, null)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Shutdown")
+                    }
                     OutlinedButton({ confirmAction = VmAction.STOP }, enabled = !busy, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.Stop, null)
                         Spacer(Modifier.width(4.dp))
@@ -341,26 +364,33 @@ private fun VmCard(vm: ProxmoxVm, busy: Boolean, onAction: (ProxmoxVm, VmAction)
                     }
                 }
             }
+            if (vm.isRunning && vm.isQemu) {
+                OutlinedButton({ confirmAction = VmAction.RESET }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(4.dp)); Text("Reset (QEMU)")
+                }
+            }
         }
     }
     confirmAction?.let { action ->
         val stop = action == VmAction.STOP
+        val shutdown = action == VmAction.SHUTDOWN
+        val reset = action == VmAction.RESET
         AlertDialog(
             onDismissRequest = { confirmAction = null },
-            title = { Text(if (stop) "Zaustavi " + vm.name + "?" else "Restartaj " + vm.name + "?") },
+            title = { Text(when { stop -> "Zaustavi ${vm.name}?"; shutdown -> "Shutdown ${vm.name}?"; reset -> "Reset ${vm.name}?"; else -> "Restartaj ${vm.name}?" }) },
             text = { Text("Ova radnja će se poslati Proxmox serveru.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmAction = null
                     onAction(vm, action)
-                }) { Text(if (stop) "Zaustavi" else "Restartaj") }
+                }) { Text(when { stop -> "Zaustavi"; shutdown -> "Shutdown"; reset -> "Reset"; else -> "Restartaj" }) }
             },
             dismissButton = { TextButton(onClick = { confirmAction = null }) { Text("Odustani") } }
         )
     }
 }
 
-private enum class VmAction { START, STOP, REBOOT }
+private enum class VmAction { START, STOP, REBOOT, SHUTDOWN, RESET }
 
 private fun formatBytes(value: Long): String {
     if (value <= 0) return "0 B"
