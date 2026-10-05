@@ -31,7 +31,9 @@ fun ProxmoxApp() {
         Surface(modifier = Modifier.fillMaxSize()) {
             var showSettings by remember { mutableStateOf(true) }
             var connectedBase by remember { mutableStateOf<String?>(null) }
-            var nodes by remember { mutableStateOf<List<ProxmoxNode>>(emptyList()) }\n            var vms by remember { mutableStateOf<List<ProxmoxVm>>(emptyList()) }\n            var vmLoading by remember { mutableStateOf(false) }
+            var nodes by remember { mutableStateOf<List<ProxmoxNode>>(emptyList()) }
+            var vms by remember { mutableStateOf<List<ProxmoxVm>>(emptyList()) }
+            var vmLoading by remember { mutableStateOf(false) }
             var loading by remember { mutableStateOf(false) }
             var error by remember { mutableStateOf<String?>(null) }
             var connection by remember { mutableStateOf(ProxmoxConnection("", "", "", "")) }
@@ -60,12 +62,33 @@ fun ProxmoxApp() {
                 Dashboard(
                     base = connectedBase!!,
                     nodes = nodes,
+                    vms = vms,
                     loading = loading,
+                    vmLoading = vmLoading,
+                    onVmAction = { vm, action ->
+                        vmLoading = true
+                        scope.launch {
+                            try {
+                                when (action) {
+                                    VmAction.START -> api.startVm(connectedBase!!, connection, vm)
+                                    VmAction.STOP -> api.stopVm(connectedBase!!, connection, vm)
+                                    VmAction.REBOOT -> api.rebootVm(connectedBase!!, connection, vm)
+                                }
+                                vms = api.getVms(connectedBase!!, connection)
+                                error = null
+                            } catch (e: Exception) {
+                                error = e.message ?: "Radnja nije uspjela."
+                            } finally {
+                                vmLoading = false
+                            }
+                        }
+                    },
                     onRefresh = {
                         loading = true
                         scope.launch {
                             try {
                                 nodes = api.getNodes(connectedBase!!, connection)
+                                vms = api.getVms(connectedBase!!, connection)
                                 error = null
                             } catch (e: Exception) {
                                 error = e.message ?: "Greška."
@@ -137,7 +160,10 @@ private fun ConnectionScreen(
 private fun Dashboard(
     base: String,
     nodes: List<ProxmoxNode>,
+    vms: List<ProxmoxVm>,
     loading: Boolean,
+    vmLoading: Boolean,
+    onVmAction: (ProxmoxVm, VmAction) -> Unit,
     onRefresh: () -> Unit,
     onSettings: () -> Unit,
     error: String?
@@ -294,6 +320,64 @@ private fun VmCard(vm: ProxmoxVm, busy: Boolean, onAction: (ProxmoxVm, VmAction)
                     }
                 } else {
                     Button({ onAction(vm, VmAction.START) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.PlayArrow, null)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Start")
+                    }
+                }
+            }
+        }
+    }
+    confirmAction?.let { action ->
+        val stop = action == VmAction.STOP
+        AlertDialog(
+            onDismissRequest = { confirmAction = null },
+            title = { Text(if (stop) "Zaustavi " + vm.name + "?" else "Restartaj " + vm.name + "?") },
+            text = { Text("Ova radnja će se poslati Proxmox serveru.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmAction = null
+                    onAction(vm, action)
+                }) { Text(if (stop) "Zaustavi" else "Restartaj") }
+            },
+            dismissButton = { TextButton(onClick = { confirmAction = null }) { Text("Odustani") } }
+        )
+    }
+}
+
+private enum class VmAction { START, STOP, REBOOT }
+
+@Composable
+private fun VmCard(vm: ProxmoxVm, busy: Boolean, onAction: (ProxmoxVm, VmAction) -> Unit) {
+    var confirmAction by remember { mutableStateOf<VmAction?>(null) }
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(vm.name, style = MaterialTheme.typography.titleLarge)
+                    Text(vm.type.uppercase() + " • VMID " + vm.vmid + " • " + vm.node)
+                }
+                Text(vm.status)
+            }
+            Spacer(Modifier.height(8.dp))
+            Text("RAM: " + formatBytes(vm.mem) + " / " + formatBytes(vm.maxMem))
+            Text("CPU: " + "%.1f".format(vm.cpu * 100) + "%")
+            if (vm.maxDisk > 0) Text("Disk: " + formatBytes(vm.maxDisk))
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (vm.isRunning) {
+                    OutlinedButton(onClick = { confirmAction = VmAction.REBOOT }, enabled = !busy, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.RestartAlt, null)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Restart")
+                    }
+                    OutlinedButton(onClick = { confirmAction = VmAction.STOP }, enabled = !busy, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.Stop, null)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Stop")
+                    }
+                } else {
+                    Button(onClick = { onAction(vm, VmAction.START) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Default.PlayArrow, null)
                         Spacer(Modifier.width(4.dp))
                         Text("Start")
