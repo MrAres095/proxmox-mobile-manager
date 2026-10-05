@@ -66,8 +66,11 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
 
-      - name: Prepare release APK
-        run: cp app/build/outputs/apk/release/app-release.apk proxmox-mobile-manager.apk
+      - name: Prepare release APKs
+        run: |
+          set -euo pipefail
+          cp app/build/outputs/apk/release/app-release.apk proxmox-mobile-manager.apk
+          cp app/build/outputs/apk/release/app-release.apk "Proxmox-Mobile-Manager-v0.1.${{ github.run_number }}.apk"
 
       - name: Create GitHub Release
         env:
@@ -75,4 +78,4 @@ jobs:
           TAG_NAME: v0.1.${{ github.run_number }}
         run: |
           set -euo pipefail
-          gh release create "$TAG_NAME" proxmox-mobile-manager.apk --title "Proxmox Mobile Manager $TAG_NAME" --generate-notes
+          gh release create "$TAG_NAME" proxmox-mobile-manager.apk "Proxmox-Mobile-Manager-v0.1.${{ github.run_number }}.apk" --title "Proxmox Mobile Manager $TAG_NAME" --generate-notes
