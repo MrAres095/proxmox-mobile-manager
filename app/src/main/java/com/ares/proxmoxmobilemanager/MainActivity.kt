@@ -1,6 +1,7 @@
 package com.ares.proxmoxmobilemanager
 
 import android.os.Bundle
+import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
@@ -36,12 +37,15 @@ fun ProxmoxApp() {
             var vmLoading by remember { mutableStateOf(false) }
             var loading by remember { mutableStateOf(false) }
             var error by remember { mutableStateOf<String?>(null) }
-            var connection by remember { mutableStateOf(ProxmoxConnection("", "", "", "")) }
+            val context = LocalContext.current
+            val prefs = remember { context.getSharedPreferences("proxmox_connection", Context.MODE_PRIVATE) }
+            var connection by remember { mutableStateOf(ProxmoxConnection(prefs.getString("localUrl", "") ?: "", "", prefs.getString("tokenId", "") ?: "", prefs.getString("tokenSecret", "") ?: "")) }
             val scope = rememberCoroutineScope()
 
             if (showSettings || connectedBase == null) {
                 ConnectionScreen(connection, loading, error) { newConnection ->
                     connection = newConnection
+                    prefs.edit().putString("localUrl", newConnection.localUrl).putString("tokenId", newConnection.tokenId).putString("tokenSecret", newConnection.tokenSecret).apply()
                     loading = true
                     error = null
                     scope.launch {
@@ -114,7 +118,7 @@ private fun ConnectionScreen(
     onConnect: (ProxmoxConnection) -> Unit
 ) {
     var local by remember { mutableStateOf(initial.localUrl) }
-    var remote by remember { mutableStateOf(initial.remoteUrl) }
+    var port by remember { mutableStateOf("8006") }
     var tokenId by remember { mutableStateOf(initial.tokenId) }
     var secret by remember { mutableStateOf(initial.tokenSecret) }
 
@@ -125,11 +129,11 @@ private fun ConnectionScreen(
         ) {
             Text("Poveži Proxmox", style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(8.dp))
-            Text("Aplikacija prvo pokušava lokalnu adresu, a zatim udaljenu domenu.")
+            Text("Na lokalnoj mreži dovoljno je upisati IP adresu Proxmox servera.")
             Spacer(Modifier.height(20.dp))
-            OutlinedTextField(local, { local = it }, Modifier.fillMaxWidth(), label = { Text("Lokalni URL") }, singleLine = true)
+            OutlinedTextField(local, { local = it }, Modifier.fillMaxWidth(), label = { Text("Proxmox IP adresa") }, placeholder = { Text("npr. 192.168.1.100") }, singleLine = true)
             Spacer(Modifier.height(10.dp))
-            OutlinedTextField(remote, { remote = it }, Modifier.fillMaxWidth(), label = { Text("Udaljeni URL") }, singleLine = true)
+            OutlinedTextField(port, { port = it.filter(Char::isDigit).take(5) }, Modifier.fillMaxWidth(), label = { Text("Port") }, placeholder = { Text("8006") }, singleLine = true)
             Spacer(Modifier.height(10.dp))
             OutlinedTextField(tokenId, { tokenId = it }, Modifier.fillMaxWidth(), label = { Text("API token ID") }, singleLine = true)
             Spacer(Modifier.height(10.dp))
@@ -141,8 +145,11 @@ private fun ConnectionScreen(
             }
             Button(
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !loading,
-                onClick = { onConnect(ProxmoxConnection(local, remote, tokenId, secret)) }
+                enabled = !loading && local.isNotBlank() && port.isNotBlank(),
+                onClick = {
+                    val endpoint = if (local.startsWith("http://") || local.startsWith("https://")) local.trimEnd('/') else "https://" + local.trim().trimEnd('/') + ":" + port.ifBlank { "8006" }
+                    onConnect(ProxmoxConnection(endpoint, "", tokenId.trim(), secret.trim()))
+                }
             ) {
                 if (loading) CircularProgressIndicator(modifier = Modifier.height(20.dp))
                 else {
