@@ -83,11 +83,12 @@ jobs:
           echo "Certificate: OK (expected fingerprint)"
 
           echo "4/4 Testing KEY_PASSWORD separately..."
-          if ! keytool -keypasswd -keystore app/proxmox-release.jks -storetype PKCS12 -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_PASSWORD" -alias "$KEY_ALIAS" -new "$KEY_PASSWORD" >/tmp/keypass-output.txt 2>/tmp/keypass-error.txt; then
+          if ! keytool -certreq -keystore app/proxmox-release.jks -storetype PKCS12 -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_PASSWORD" -alias "$KEY_ALIAS" -file /tmp/signing-test.csr >/tmp/keypass-output.txt 2>/tmp/keypass-error.txt; then
             echo "::error::KEY_PASSWORD is incorrect for alias '$KEY_ALIAS'. The keystore password and alias are correct."
             cat /tmp/keypass-error.txt
             exit 14
           fi
+          rm -f /tmp/signing-test.csr
           echo "KEY_PASSWORD: OK"
           echo "All release signing credentials are valid."
 
