@@ -7,7 +7,9 @@ Native Android app for managing Proxmox VE servers.
 - Proxmox API token connection
 - Local-first / remote fallback
 - Node dashboard
-- GitHub Actions debug APK build
+- Signed release APK builds
+- Automatic GitHub Release publishing
+- In-app update support
 
 ## Roadmap
 VM/LXC controls, storage, network, firewall, backups, snapshots, tasks/logs, HA/cluster and persistent terminal console.
