@@ -29,9 +29,9 @@ android {
         create("release") {
             val keystoreFile = file("proxmox-release.jks")
             storeFile = keystoreFile
-            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
-            keyAlias = System.getenv("KEY_ALIAS") ?: "proxmox-release"
-            keyPassword = System.getenv("KEY_PASSWORD") ?: ""
+            storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD") ?: System.getenv("KEYSTORE_PASSWORD") ?: ""
+            keyAlias = System.getenv("ANDROID_KEY_ALIAS") ?: System.getenv("KEY_ALIAS") ?: "proxmox-release"
+            keyPassword = System.getenv("ANDROID_KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD") ?: ""
             storeType = "PKCS12"
         }
     }
