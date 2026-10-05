@@ -24,6 +24,18 @@ data class ProxmoxNode(
 )
 
 
+data class ProxmoxStorage(
+    val node: String,
+    val storage: String,
+    val type: String,
+    val content: String,
+    val active: Boolean,
+    val enabled: Boolean,
+    val total: Long,
+    val used: Long,
+    val avail: Long
+)
+
 data class ProxmoxVm(
     val node: String,
     val vmid: Int,
@@ -132,9 +144,28 @@ class ProxmoxApi {
         postAction(base, connection, vm, "stop")
     }
 
-    suspend fun rebootVm(base: String, connection: ProxmoxConnection, vm: ProxmoxVm) {
-        postAction(base, connection, vm, "reboot")
+    suspend fun rebootVm(base: String, connection: ProxmoxConnection, vm: ProxmoxVm) { postAction(base, connection, vm, "reboot") }
+    suspend fun shutdownVm(base: String, connection: ProxmoxConnection, vm: ProxmoxVm) { postAction(base, connection, vm, "shutdown") }
+    suspend fun resetVm(base: String, connection: ProxmoxConnection, vm: ProxmoxVm) {
+        if (!vm.isQemu) throw IllegalStateException("Reset je dostupan za QEMU VM.")
+        postAction(base, connection, vm, "reset")
     }
+
+    suspend fun getStorage(base: String, connection: ProxmoxConnection): List<ProxmoxStorage> =
+        withContext(Dispatchers.IO) {
+            val result = mutableListOf<ProxmoxStorage>()
+            for (node in getNodes(base, connection)) {
+                try {
+                    val json = request(base, "/api2/json/nodes/${node.node}/storage", connection, 7000)
+                    val data = json.optJSONArray("data") ?: continue
+                    for (i in 0 until data.length()) {
+                        val item = data.getJSONObject(i)
+                        result += ProxmoxStorage(node.node, item.optString("storage"), item.optString("type"), item.optString("content"), item.optBoolean("active"), item.optBoolean("enabled"), item.optLong("total"), item.optLong("used"), item.optLong("avail"))
+                    }
+                } catch (_: Exception) { }
+            }
+            result
+        }
 
     private suspend fun postAction(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, action: String) =
         withContext(Dispatchers.IO) {
