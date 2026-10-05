@@ -36,17 +36,43 @@ jobs:
           chmod 600 app/proxmox-release.jks
           test -s app/proxmox-release.jks
 
-      - name: Verify keystore before Gradle
+      - name: Diagnose keystore secrets
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          test -n "$KEYSTORE_PASSWORD"
-          test -n "$KEY_ALIAS"
-          test -n "$KEY_PASSWORD"
-          keytool -list -keystore app/proxmox-release.jks -storetype PKCS12 -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
-          keytool -list -keystore app/proxmox-release.jks -storetype PKCS12 -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
+          set +e
+
+          echo "=== Secret presence ==="
+          [ -n "$KEYSTORE_PASSWORD" ] && echo "KEYSTORE_PASSWORD: PRESENT" || echo "KEYSTORE_PASSWORD: MISSING"
+          [ -n "$KEY_PASSWORD" ] && echo "KEY_PASSWORD: PRESENT" || echo "KEY_PASSWORD: MISSING"
+          [ -n "$KEY_ALIAS" ] && echo "KEY_ALIAS: PRESENT" || echo "KEY_ALIAS: MISSING"
+          echo "KEY_ALIAS value: $KEY_ALIAS"
+
+          echo
+          echo "=== Keystore password test ==="
+          keytool -list -keystore app/proxmox-release.jks -storetype PKCS12 -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1
+          STORE_RESULT=$?
+          [ $STORE_RESULT -eq 0 ] && echo "KEYSTORE_PASSWORD: OK" || echo "KEYSTORE_PASSWORD: FAILED"
+
+          echo
+          echo "=== Private-key password test ==="
+          keytool -list -keystore app/proxmox-release.jks -storetype PKCS12 -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1
+          KEY_RESULT=$?
+          [ $KEY_RESULT -eq 0 ] && echo "KEY_PASSWORD: OK" || echo "KEY_PASSWORD: FAILED"
+
+          echo
+          echo "=== Final diagnosis ==="
+          if [ $STORE_RESULT -ne 0 ]; then
+            echo "DIAGNOSIS: KEYSTORE_PASSWORD does not unlock the keystore, or KEY_ALIAS is wrong."
+            exit 1
+          fi
+          if [ $KEY_RESULT -ne 0 ]; then
+            echo "DIAGNOSIS: KEY_PASSWORD does not unlock the private key."
+            exit 1
+          fi
+          echo "DIAGNOSIS: All keystore secrets are valid."
 
       - name: Build signed release APK
         env:
