@@ -347,64 +347,6 @@ private fun VmCard(vm: ProxmoxVm, busy: Boolean, onAction: (ProxmoxVm, VmAction)
 
 private enum class VmAction { START, STOP, REBOOT }
 
-@Composable
-private fun VmCard(vm: ProxmoxVm, busy: Boolean, onAction: (ProxmoxVm, VmAction) -> Unit) {
-    var confirmAction by remember { mutableStateOf<VmAction?>(null) }
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(vm.name, style = MaterialTheme.typography.titleLarge)
-                    Text(vm.type.uppercase() + " • VMID " + vm.vmid + " • " + vm.node)
-                }
-                Text(vm.status)
-            }
-            Spacer(Modifier.height(8.dp))
-            Text("RAM: " + formatBytes(vm.mem) + " / " + formatBytes(vm.maxMem))
-            Text("CPU: " + "%.1f".format(vm.cpu * 100) + "%")
-            if (vm.maxDisk > 0) Text("Disk: " + formatBytes(vm.maxDisk))
-            Spacer(Modifier.height(12.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (vm.isRunning) {
-                    OutlinedButton(onClick = { confirmAction = VmAction.REBOOT }, enabled = !busy, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.RestartAlt, null)
-                        Spacer(Modifier.width(4.dp))
-                        Text("Restart")
-                    }
-                    OutlinedButton(onClick = { confirmAction = VmAction.STOP }, enabled = !busy, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.Stop, null)
-                        Spacer(Modifier.width(4.dp))
-                        Text("Stop")
-                    }
-                } else {
-                    Button(onClick = { onAction(vm, VmAction.START) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Default.PlayArrow, null)
-                        Spacer(Modifier.width(4.dp))
-                        Text("Start")
-                    }
-                }
-            }
-        }
-    }
-    confirmAction?.let { action ->
-        val stop = action == VmAction.STOP
-        AlertDialog(
-            onDismissRequest = { confirmAction = null },
-            title = { Text(if (stop) "Zaustavi " + vm.name + "?" else "Restartaj " + vm.name + "?") },
-            text = { Text("Ova radnja će se poslati Proxmox serveru.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmAction = null
-                    onAction(vm, action)
-                }) { Text(if (stop) "Zaustavi" else "Restartaj") }
-            },
-            dismissButton = { TextButton(onClick = { confirmAction = null }) { Text("Odustani") } }
-        )
-    }
-}
-
-private enum class VmAction { START, STOP, REBOOT }
-
 private fun formatBytes(value: Long): String {
     if (value <= 0) return "0 B"
     val units = arrayOf("B", "KB", "MB", "GB", "TB")
