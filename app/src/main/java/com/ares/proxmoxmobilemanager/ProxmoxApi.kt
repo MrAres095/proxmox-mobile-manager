@@ -84,6 +84,19 @@ class ProxmoxApi {
         }
     }
 
+    suspend fun getConsoleAuthHeaders(base: String, connection: ProxmoxConnection): Map<String, String> {
+        ensureLocalLogin(base, connection)
+        return if (base == connection.localUrl.trim().trimEnd('/') && localTicket != null) {
+            buildMap {
+                put("Cookie", "PVEAuthCookie=" + localTicket)
+                localCsrf?.let { put("CSRFPreventionToken", it) }
+            }
+        } else {
+            if (connection.tokenId.isBlank() || connection.tokenSecret.isBlank()) throw IllegalStateException("Za udaljeni pristup upiši API token ID i Secret.")
+            mapOf("Authorization" to "PVEAPIToken=" + connection.tokenId + "=" + connection.tokenSecret)
+        }
+    }
+
     private fun applyAuth(conn: HttpURLConnection, base: String, connection: ProxmoxConnection) {
         if (base == connection.localUrl.trim().trimEnd('/') && localTicket != null) {
             conn.setRequestProperty("Cookie", "PVEAuthCookie=" + localTicket)
