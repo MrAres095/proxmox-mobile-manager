@@ -5,10 +5,13 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 
 data class ProxmoxConnection(
     val localUrl: String,
     val remoteUrl: String,
+    val username: String,
+    val password: String,
     val tokenId: String,
     val tokenSecret: String
 )
@@ -52,6 +55,45 @@ data class ProxmoxVm(
 }
 
 class ProxmoxApi {
+    private var localTicket: String? = null
+    private var localCsrf: String? = null
+    private var localUser: String? = null
+
+    private suspend fun ensureLocalLogin(base: String, connection: ProxmoxConnection) {
+        if (base != connection.localUrl.trim().trimEnd('/')) return
+        if (connection.username.isBlank() || connection.password.isBlank()) throw IllegalStateException("Za lokalno spajanje upiši korisničko ime i lozinku.")
+        if (localTicket != null && localUser == connection.username) return
+        withContext(Dispatchers.IO) {
+            val url = URL(base.trimEnd('/') + "/api2/json/access/ticket")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                connectTimeout = 5000; readTimeout = 7000; requestMethod = "POST"; doOutput = true
+                setRequestProperty("Accept", "application/json"); setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+            }
+            try {
+                val form = "username=" + URLEncoder.encode(connection.username.trim(), "UTF-8") + "&password=" + URLEncoder.encode(connection.password, "UTF-8")
+                conn.outputStream.use { it.write(form.toByteArray(Charsets.UTF_8)) }
+                val code = conn.responseCode
+                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+                val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                if (code !in 200..299) throw IllegalStateException(if (code == 401) "Lokalna prijava nije uspjela: korisničko ime ili lozinka nisu ispravni." else "Proxmox prijava HTTP $code: $body")
+                val data = JSONObject(body).getJSONObject("data")
+                localTicket = data.getString("ticket")
+                localCsrf = data.optString("CSRFPreventionToken").ifBlank { null }
+                localUser = data.optString("username", connection.username.trim())
+            } finally { conn.disconnect() }
+        }
+    }
+
+    private fun applyAuth(conn: HttpURLConnection, base: String, connection: ProxmoxConnection) {
+        if (base == connection.localUrl.trim().trimEnd('/') && localTicket != null) {
+            conn.setRequestProperty("Cookie", "PVEAuthCookie=" + localTicket)
+            localCsrf?.let { conn.setRequestProperty("CSRFPreventionToken", it) }
+        } else {
+            if (connection.tokenId.isBlank() || connection.tokenSecret.isBlank()) throw IllegalStateException("Za udaljeni pristup upiši API token ID i Secret.")
+            conn.setRequestProperty("Authorization", "PVEAPIToken=" + connection.tokenId + "=" + connection.tokenSecret)
+        }
+    }
+
     suspend fun findReachableBase(connection: ProxmoxConnection): String? {
         val candidates = listOf(connection.localUrl, connection.remoteUrl)
             .map { it.trim().trimEnd('/') }
@@ -173,14 +215,16 @@ class ProxmoxApi {
             post(base, "/api2/json/nodes/${vm.node}/$endpoint/${vm.vmid}/status/$action", connection, 10000)
         }
 
-    private fun post(base: String, path: String, connection: ProxmoxConnection, timeout: Int): JSONObject {
+    private suspend fun post(base: String, path: String, connection: ProxmoxConnection, timeout: Int): JSONObject {
+        ensureLocalLogin(base, connection)
+        return withContext(Dispatchers.IO) {
         val url = URL(base.trimEnd('/') + path)
         val conn = (url.openConnection() as HttpURLConnection).apply {
             connectTimeout = timeout
             readTimeout = timeout
             requestMethod = "POST"
             doOutput = true
-            setRequestProperty("Authorization", "PVEAPIToken=${connection.tokenId}=${connection.tokenSecret}")
+            applyAuth(this, base, connection)
             setRequestProperty("Accept", "application/json")
             setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
         }
@@ -193,6 +237,7 @@ class ProxmoxApi {
         } finally {
             conn.disconnect()
         }
+        }
     }
 
     private suspend fun request(
@@ -200,16 +245,15 @@ class ProxmoxApi {
         path: String,
         connection: ProxmoxConnection,
         timeout: Int
-    ): JSONObject = withContext(Dispatchers.IO) {
+    ): JSONObject {
+        ensureLocalLogin(base, connection)
+        return withContext(Dispatchers.IO) {
         val url = URL(base.trimEnd('/') + path)
         val conn = (url.openConnection() as HttpURLConnection).apply {
             connectTimeout = timeout
             readTimeout = timeout
             requestMethod = "GET"
-            setRequestProperty(
-                "Authorization",
-                "PVEAPIToken=${connection.tokenId}=${connection.tokenSecret}"
-            )
+            applyAuth(this, base, connection)
             setRequestProperty("Accept", "application/json")
         }
 
@@ -223,6 +267,7 @@ class ProxmoxApi {
             JSONObject(body)
         } finally {
             conn.disconnect()
+        }
         }
     }
 }
