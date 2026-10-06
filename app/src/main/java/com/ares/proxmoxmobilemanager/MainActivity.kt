@@ -181,8 +181,8 @@ private fun ConnectionScreen(
             Spacer(Modifier.height(18.dp))
             if (error != null) { Text(error, color = MaterialTheme.colorScheme.error); Spacer(Modifier.height(12.dp)) }
             Button(modifier = Modifier.fillMaxWidth(), enabled = !loading && (local.isNotBlank() || remote.isNotBlank()), onClick = {
-                val endpoint = if (local.isBlank()) "" else "https://" + local.trim().removePrefix("https://").removePrefix("http://").trimEnd("/") + ":" + localPort.ifBlank { "8006" }
-                onConnect(ProxmoxConnection(endpoint, remote.trim().trimEnd("/"), username.trim(), password, tokenId.trim(), secret.trim()))
+                val endpoint = if (local.isBlank()) "" else "https://" + local.trim().removePrefix("https://").removePrefix("http://").trimEnd('/') + ":" + localPort.ifBlank { "8006" }
+                onConnect(ProxmoxConnection(endpoint, remote.trim().trimEnd('/'), username.trim(), password, tokenId.trim(), secret.trim()))
             }) {
                 if (loading) CircularProgressIndicator(modifier = Modifier.height(20.dp))
                 else { Icon(Icons.Default.Cloud, contentDescription = null); Spacer(Modifier.padding(horizontal = 4.dp)); Text("Poveži se") }
