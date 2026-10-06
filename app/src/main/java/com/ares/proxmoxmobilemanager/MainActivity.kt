@@ -60,6 +60,10 @@ fun ProxmoxApp() {
                                 ?: throw IllegalStateException("Nijedan Proxmox URL nije dostupan.")
                             connectedBase = base
                             nodes = api.getNodes(base, newConnection)
+                            // Učitaj stvarne VM/LXC resurse i storage odmah nakon prijave.
+                            // Prije su se učitavali tek nakon ručnog osvježavanja.
+                            vms = api.getVms(base, newConnection)
+                            storage = api.getStorage(base, newConnection)
                             showSettings = false
                         } catch (e: Exception) {
                             error = e.message ?: "Greška pri povezivanju."
