@@ -6,6 +6,12 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import javax.net.ssl.HostnameVerifier
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLSocketFactory
+import javax.net.ssl.X509TrustManager
+import java.security.cert.X509Certificate
 
 data class ProxmoxConnection(
     val localUrl: String,
@@ -55,6 +61,29 @@ data class ProxmoxVm(
 }
 
 class ProxmoxApi {
+    private val localTrustManager = object : X509TrustManager {
+        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) = Unit
+        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) = Unit
+        override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+    }
+
+    private val localSslSocketFactory: SSLSocketFactory by lazy {
+        SSLContext.getInstance("TLS").apply {
+            init(null, arrayOf(localTrustManager), java.security.SecureRandom())
+        }.socketFactory
+    }
+
+    private val localHostnameVerifier = HostnameVerifier { _, _ -> true }
+
+    private fun openConnection(url: URL, base: String, connection: ProxmoxConnection): HttpURLConnection {
+        val http = url.openConnection() as HttpURLConnection
+        if (base == connection.localUrl.trim().trimEnd('/') && http is HttpsURLConnection) {
+            http.sslSocketFactory = localSslSocketFactory
+            http.hostnameVerifier = localHostnameVerifier
+        }
+        return http
+    }
+
     private var localTicket: String? = null
     private var localCsrf: String? = null
     private var localUser: String? = null
@@ -65,12 +94,13 @@ class ProxmoxApi {
         if (localTicket != null && localUser == connection.username) return
         withContext(Dispatchers.IO) {
             val url = URL(base.trimEnd('/') + "/api2/json/access/ticket")
-            val conn = (url.openConnection() as HttpURLConnection).apply {
+            val conn = openConnection(url, base, connection).apply {
                 connectTimeout = 5000; readTimeout = 7000; requestMethod = "POST"; doOutput = true
                 setRequestProperty("Accept", "application/json"); setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
             }
             try {
-                val form = "username=" + URLEncoder.encode(connection.username.trim(), "UTF-8") + "&password=" + URLEncoder.encode(connection.password, "UTF-8")
+                val loginUser = connection.username.trim().let { if (it.contains("@")) it else "$it@pam" }
+                val form = "username=" + URLEncoder.encode(loginUser, "UTF-8") + "&password=" + URLEncoder.encode(connection.password, "UTF-8")
                 conn.outputStream.use { it.write(form.toByteArray(Charsets.UTF_8)) }
                 val code = conn.responseCode
                 val stream = if (code in 200..299) conn.inputStream else conn.errorStream
