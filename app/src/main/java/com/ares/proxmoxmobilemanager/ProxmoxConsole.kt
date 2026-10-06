@@ -9,6 +9,7 @@ import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 class ProxmoxConsole(
+    private val api: ProxmoxApi = ProxmoxApi(),
     private val client: OkHttpClient = OkHttpClient.Builder()
         .pingInterval(30, TimeUnit.SECONDS)
         .build()
@@ -25,11 +26,12 @@ class ProxmoxConsole(
     ) {
         val type = if (vm.isQemu) "qemu" else "lxc"
         val proxyUrl = base.trimEnd('/') + "/api2/json/nodes/" + vm.node + "/" + type + "/" + vm.vmid + "/termproxy"
+        val authHeaders = api.getConsoleAuthHeaders(base, connection)
         val session = withContext(Dispatchers.IO) {
             val req = Request.Builder()
                 .url(proxyUrl)
                 .post(RequestBody.create(null, ByteArray(0)))
-                .header("Authorization", "PVEAPIToken=" + connection.tokenId + "=" + connection.tokenSecret)
+                .apply { authHeaders.forEach { (k, v) -> header(k, v) } }
                 .build()
             client.newCall(req).execute().use { res ->
                 val body = res.body?.string().orEmpty()
