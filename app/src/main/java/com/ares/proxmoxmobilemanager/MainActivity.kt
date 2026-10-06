@@ -159,9 +159,12 @@ private fun ConnectionScreen(
     Scaffold(
         topBar = { TopAppBar(title = { Text("Proxmox Mobile Manager") }) },
         bottomBar = {
-            Surface(shadowElevation = 8.dp) {
+            Surface(
+                modifier = Modifier.navigationBarsPadding(),
+                shadowElevation = 8.dp
+            ) {
                 Button(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
                     enabled = !loading && (local.isNotBlank() || remote.isNotBlank()),
                     onClick = {
                         val endpoint = if (local.isBlank()) "" else "https://" + local.trim().removePrefix("https://").removePrefix("http://").trimEnd('/') + ":" + localPort.ifBlank { "8006" }
