@@ -44,13 +44,13 @@ fun ProxmoxApp() {
             var updateStatuses by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
             val context = LocalContext.current
             val prefs = remember { context.getSharedPreferences("proxmox_connection", Context.MODE_PRIVATE) }
-            var connection by remember { mutableStateOf(ProxmoxConnection(prefs.getString("localUrl", "") ?: "", prefs.getString("remoteUrl", "") ?: "", prefs.getString("tokenId", "") ?: "", prefs.getString("tokenSecret", "") ?: "")) }
+            var connection by remember { mutableStateOf(ProxmoxConnection(prefs.getString("localUrl", "") ?: "", prefs.getString("remoteUrl", "") ?: "", prefs.getString("username", "") ?: "", prefs.getString("password", "") ?: "", prefs.getString("tokenId", "") ?: "", prefs.getString("tokenSecret", "") ?: "")) }
             val scope = rememberCoroutineScope()
 
             if (consoleVm != null && connectedBase != null) { ConsoleScreen(connectedBase!!, connection, consoleVm!!, { console.close(); consoleVm=null }) } else if (showSettings || connectedBase == null) {
                 ConnectionScreen(connection, loading, error) { newConnection ->
                     connection = newConnection
-                    prefs.edit().putString("localUrl", newConnection.localUrl).putString("remoteUrl", newConnection.remoteUrl).putString("tokenId", newConnection.tokenId).putString("tokenSecret", newConnection.tokenSecret).apply()
+                    prefs.edit().putString("localUrl", newConnection.localUrl).putString("remoteUrl", newConnection.remoteUrl).putString("username", newConnection.username).putString("password", newConnection.password).putString("tokenId", newConnection.tokenId).putString("tokenSecret", newConnection.tokenSecret).apply()
                     loading = true
                     error = null
                     scope.launch {
@@ -147,59 +147,49 @@ private fun ConnectionScreen(
     error: String?,
     onConnect: (ProxmoxConnection) -> Unit
 ) {
-    var local by remember { mutableStateOf(initial.localUrl) }
+    var local by remember { mutableStateOf(initial.localUrl.removePrefix("https://").removePrefix("http://").substringBefore(":8006")) }
     var localPort by remember { mutableStateOf("8006") }
+    var username by remember { mutableStateOf(initial.username) }
+    var password by remember { mutableStateOf(initial.password) }
     var remote by remember { mutableStateOf(initial.remoteUrl) }
     var tokenId by remember { mutableStateOf(initial.tokenId) }
     var secret by remember { mutableStateOf(initial.tokenSecret) }
 
     Scaffold(topBar = { TopAppBar(title = { Text("Proxmox Mobile Manager") }) }) { padding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(20.dp),
-            verticalArrangement = Arrangement.Center
-        ) {
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(20.dp), verticalArrangement = Arrangement.Center) {
             Text("Poveži Proxmox", style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(8.dp))
-            Text("Lokalni i udaljeni pristup mogu biti spremljeni zajedno. Aplikacija automatski koristi dostupnu adresu, a ako obje vode na isti Proxmox tretira ih kao jedan server.")
+            Text("Na lokalnoj mreži koristi IP, korisničko ime i lozinku. Za udaljeni pristup domenom koristi se API token.")
             Spacer(Modifier.height(20.dp))
             Text("Lokalna mreža", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(6.dp))
-            OutlinedTextField(local, { local = it }, Modifier.fillMaxWidth(), label = { Text("IP adresa") }, placeholder = { Text("npr. 192.168.1.100") }, singleLine = true)
+            OutlinedTextField(local, { local = it }, Modifier.fillMaxWidth(), label = { Text("IP adresa") }, placeholder = { Text("npr. 192.168.1.37") }, singleLine = true)
             Spacer(Modifier.height(10.dp))
             OutlinedTextField(localPort, { localPort = it.filter(Char::isDigit).take(5) }, Modifier.fillMaxWidth(), label = { Text("Port") }, placeholder = { Text("8006") }, singleLine = true)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
+            OutlinedTextField(username, { username = it }, Modifier.fillMaxWidth(), label = { Text("Korisničko ime") }, placeholder = { Text("root@pam") }, singleLine = true)
+            Spacer(Modifier.height(10.dp))
+            OutlinedTextField(password, { password = it }, Modifier.fillMaxWidth(), label = { Text("Lozinka") }, singleLine = true, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
+            Spacer(Modifier.height(18.dp))
             Text("Udaljeni pristup", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(6.dp))
-            OutlinedTextField(remote, { remote = it }, Modifier.fillMaxWidth(), label = { Text("Javna IP / domena / VPN adresa") }, placeholder = { Text("https://proxmox.mojadomena.hr:8006") }, singleLine = true)
+            OutlinedTextField(remote, { remote = it }, Modifier.fillMaxWidth(), label = { Text("Domena / javna IP") }, placeholder = { Text("https://proxmox.mojadomena.hr:8006") }, singleLine = true)
             Spacer(Modifier.height(10.dp))
-            Text("Udaljena adresa može biti javna IP adresa, domena ili VPN adresa.")
-            OutlinedTextField(tokenId, { tokenId = it }, Modifier.fillMaxWidth(), label = { Text("API token ID") }, singleLine = true)
+            OutlinedTextField(tokenId, { tokenId = it }, Modifier.fillMaxWidth(), label = { Text("API token ID") }, placeholder = { Text("root@pam!mobile") }, singleLine = true)
             Spacer(Modifier.height(10.dp))
-            OutlinedTextField(secret, { secret = it }, Modifier.fillMaxWidth(), label = { Text("API token secret") }, singleLine = true)
+            OutlinedTextField(secret, { secret = it }, Modifier.fillMaxWidth(), label = { Text("API token secret") }, singleLine = true, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
             Spacer(Modifier.height(18.dp))
-            if (error != null) {
-                Text(error, color = MaterialTheme.colorScheme.error)
-                Spacer(Modifier.height(12.dp))
-            }
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !loading && (local.isNotBlank() || remote.isNotBlank()),
-                onClick = {
-                    val endpoint = if (local.isBlank()) "" else if (local.startsWith("http://") || local.startsWith("https://")) local.trimEnd('/') else "https://" + local.trim().trimEnd('/') + ":" + localPort.ifBlank { "8006" }
-                    onConnect(ProxmoxConnection(endpoint, remote.trim().trimEnd('/'), tokenId.trim(), secret.trim()))
-                }
-            ) {
+            if (error != null) { Text(error, color = MaterialTheme.colorScheme.error); Spacer(Modifier.height(12.dp)) }
+            Button(modifier = Modifier.fillMaxWidth(), enabled = !loading && (local.isNotBlank() || remote.isNotBlank()), onClick = {
+                val endpoint = if (local.isBlank()) "" else "https://" + local.trim().removePrefix("https://").removePrefix("http://").trimEnd("/") + ":" + localPort.ifBlank { "8006" }
+                onConnect(ProxmoxConnection(endpoint, remote.trim().trimEnd("/"), username.trim(), password, tokenId.trim(), secret.trim()))
+            }) {
                 if (loading) CircularProgressIndicator(modifier = Modifier.height(20.dp))
-                else {
-                    Icon(Icons.Default.Cloud, contentDescription = null)
-                    Spacer(Modifier.padding(horizontal = 4.dp))
-                    Text("Poveži se")
-                }
+                else { Icon(Icons.Default.Cloud, contentDescription = null); Spacer(Modifier.padding(horizontal = 4.dp)); Text("Poveži se") }
             }
         }
     }
 }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Dashboard(
