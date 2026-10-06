@@ -155,8 +155,36 @@ private fun ConnectionScreen(
     var tokenId by remember { mutableStateOf(initial.tokenId) }
     var secret by remember { mutableStateOf(initial.tokenSecret) }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Proxmox Mobile Manager") }) }) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(20.dp), verticalArrangement = Arrangement.Center) {
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("Proxmox Mobile Manager") }) },
+        bottomBar = {
+            Surface(shadowElevation = 8.dp) {
+                Button(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                    enabled = !loading && (local.isNotBlank() || remote.isNotBlank()),
+                    onClick = {
+                        val endpoint = if (local.isBlank()) "" else "https://" + local.trim().removePrefix("https://").removePrefix("http://").trimEnd('/') + ":" + localPort.ifBlank { "8006" }
+                        onConnect(ProxmoxConnection(endpoint, remote.trim().trimEnd('/'), username.trim(), password, tokenId.trim(), secret.trim()))
+                    }
+                ) {
+                    if (loading) CircularProgressIndicator(modifier = Modifier.height(20.dp))
+                    else {
+                        Icon(Icons.Default.Login, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Log in / Poveži se")
+                    }
+                }
+            }
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(20.dp)
+                .verticalScroll(androidx.compose.foundation.rememberScrollState()),
+            verticalArrangement = Arrangement.Top
+        ) {
             Text("Poveži Proxmox", style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(8.dp))
             Text("Na lokalnoj mreži koristi IP, korisničko ime i lozinku. Za udaljeni pristup domenom koristi se API token.")
@@ -180,13 +208,7 @@ private fun ConnectionScreen(
             OutlinedTextField(secret, { secret = it }, Modifier.fillMaxWidth(), label = { Text("API token secret") }, singleLine = true, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
             Spacer(Modifier.height(18.dp))
             if (error != null) { Text(error, color = MaterialTheme.colorScheme.error); Spacer(Modifier.height(12.dp)) }
-            Button(modifier = Modifier.fillMaxWidth(), enabled = !loading && (local.isNotBlank() || remote.isNotBlank()), onClick = {
-                val endpoint = if (local.isBlank()) "" else "https://" + local.trim().removePrefix("https://").removePrefix("http://").trimEnd('/') + ":" + localPort.ifBlank { "8006" }
-                onConnect(ProxmoxConnection(endpoint, remote.trim().trimEnd('/'), username.trim(), password, tokenId.trim(), secret.trim()))
-            }) {
-                if (loading) CircularProgressIndicator(modifier = Modifier.height(20.dp))
-                else { Icon(Icons.Default.Cloud, contentDescription = null); Spacer(Modifier.padding(horizontal = 4.dp)); Text("Poveži se") }
-            }
+
         }
     }
 }
