@@ -246,7 +246,7 @@ class ProxmoxApi {
             val stream = if (code in 200..299) conn.inputStream else conn.errorStream
             val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
             if (code !in 200..299) throw IllegalStateException("Proxmox HTTP $code: $body")
-            return JSONObject(body)
+            JSONObject(body)
         } finally {
             conn.disconnect()
         }
