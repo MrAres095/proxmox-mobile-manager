@@ -292,7 +292,7 @@ class ProxmoxApi {
         ensureLocalLogin(base, connection)
         return withContext(Dispatchers.IO) {
         val url = URL(base.trimEnd('/') + path)
-        val conn = (url.openConnection() as HttpURLConnection).apply {
+        val conn = openConnection(url, base, connection).apply {
             connectTimeout = timeout
             readTimeout = timeout
             requestMethod = "GET"
