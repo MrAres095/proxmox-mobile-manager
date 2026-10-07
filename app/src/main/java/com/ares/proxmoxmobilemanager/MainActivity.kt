@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 private val api = ProxmoxApi()
 private val console = ProxmoxConsole()
@@ -901,5 +903,7 @@ private fun formatBytes(value: Long): String {
 @Composable
 private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,onBack:()->Unit){
  val scope=rememberCoroutineScope(); var output by remember{mutableStateOf("Spajanje na Proxmox konzolu...\n")}; var input by remember{mutableStateOf("")}; var connected by remember{mutableStateOf(false)}; var error by remember{mutableStateOf<String?>(null)}
- DisposableEffect(vm){ scope.launch{try{console.open(base,connection,vm,{b->val t=String(b,Charsets.UTF_8);if(t=="OK")connected=true else output=(output+t).takeLast(30000)},{reason->connected=false;output+="\n[Veza zatvorena"+(reason?.let{": "+it}?: "")+"]\n"},{e->connected=false;error=e.message?:"Greška konzole"})}catch(e:Exception){error=e.message?:"Spajanje na konzolu nije uspjelo."}};onDispose{console.close()} }
- Scaffold(topBar={TopAppBar(title={Text(vm.name+" • Console")},navigationIcon={IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,"Natrag")}},actions={Text(if(connected)"● LIVE" else "○ povezivanje",Modifier.padding(end=12.dp))})}){p->Column(Modifier.fillMaxSize().padding(p).padding(8.dp)){Surface(Modifier.fillMaxWidth().weight(1f)){Text(output,Modifier.fillMaxSize().padding(8.dp),style=MaterialTheme.typography.bodySmall)};if(error!=null)Text(error!!,color=MaterialTheme.colorScheme.error);Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){OutlinedTextField(input,{input=it},Modifier.weight(1f),label={Text("Unos")},singleLine=true,enabled=connected);Spacer(Modifier.width(6.dp));Button({console.send(input+"\n");input=""},enabled=connected&&input.isNotEmpty()){Text("Pošalji")}};Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){TextButton({console.send("\u0003")},enabled=connected){Text("Ctrl+C")};TextButton({console.send("\u0004")},enabled=connected){Text("Ctrl+D")};TextButton({console.send("\t")},enabled=connected){Text("Tab")};TextButton({console.send("\u001b[A")},enabled=connected){Text("↑")};TextButton({console.send("\u001b[B")},enabled=connected){Text("↓")}}}}}
+ LaunchedEffect(vm){ scope.launch{try{console.open(base,connection,vm,{b->val t=String(b,Charsets.UTF_8);if(t=="OK")connected=true else output=(output+t).takeLast(30000)},{reason->connected=false;output+="\n[Veza zatvorena"+(reason?.let{": "+it}?: "")+"]\n"},{e->connected=false;error=e.message?:"Greška konzole"})}catch(e:Exception){connected=false;error=e.message?:"Spajanje na konzolu nije uspjelo."}} }
+ LaunchedEffect(vm){ while(true){ delay(15000); if(connected) console.ping() } }
+ DisposableEffect(vm){ onDispose{console.close()} }
+ Scaffold(topBar={TopAppBar(title={Text(vm.name+" • Console")},navigationIcon={IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,"Natrag")}},actions={Text(if(connected)"● LIVE" else "○ povezivanje",Modifier.padding(end=12.dp))})}){p->Column(Modifier.fillMaxSize().padding(p).padding(8.dp)){Surface(Modifier.fillMaxWidth().weight(1f)){SelectionContainer{Text(output,Modifier.fillMaxSize().padding(8.dp),style=MaterialTheme.typography.bodySmall)}};if(error!=null)Text(error!!,color=MaterialTheme.colorScheme.error);Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){OutlinedTextField(input,{input=it},Modifier.weight(1f),label={Text("Unos")},singleLine=true,enabled=connected);Spacer(Modifier.width(6.dp));Button({console.send(input+"\n");input=""},enabled=connected&&input.isNotEmpty()){Text("Pošalji")}};Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){TextButton({console.send("\u0003")},enabled=connected){Text("Ctrl+C")};TextButton({console.send("\u0004")},enabled=connected){Text("Ctrl+D")};TextButton({console.send("\t")},enabled=connected){Text("Tab")};TextButton({console.send("\u001b[A")},enabled=connected){Text("↑")};TextButton({console.send("\u001b[B")},enabled=connected){Text("↓")}}}}}
