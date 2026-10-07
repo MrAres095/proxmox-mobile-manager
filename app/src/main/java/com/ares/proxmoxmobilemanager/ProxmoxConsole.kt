@@ -52,6 +52,15 @@ class ProxmoxConsole(
             connection.username.trim().let { if (it.contains("@")) it else "$it@pam" }
         }
 
+    private fun consoleReferer(base: String, vm: ProxmoxVm, type: String): String =
+        base.trimEnd('/') + "/?console=kvm&xtermjs=1&vmid=" + vm.vmid +
+            "&vmname=" + URLEncoder.encode(vm.name, "UTF-8") +
+            "&node=" + URLEncoder.encode(vm.node, "UTF-8") + "&cmd="
+
+    private fun nodeConsoleReferer(base: String, node: ProxmoxNode): String =
+        base.trimEnd('/') + "/?console=shell&xtermjs=1&node=" +
+            URLEncoder.encode(node.node, "UTF-8") + "&cmd="
+
     suspend fun open(
         base: String,
         connection: ProxmoxConnection,
@@ -71,6 +80,8 @@ class ProxmoxConsole(
                 val req = Request.Builder()
                     .url(proxyUrl)
                     .post(RequestBody.create(null, ByteArray(0)))
+                    .header("Accept", "application/json")
+                    .header("Referer", consoleReferer(base, vm, type))
                     .apply { authHeaders.forEach { (k, v) -> header(k, v) } }
                     .build()
                 client.newCall(req).execute().use { res ->
@@ -92,6 +103,10 @@ class ProxmoxConsole(
                 "/vncwebsocket?port=" + session.first + "&vncticket=" + URLEncoder.encode(session.second, "UTF-8")
             val req = Request.Builder()
                 .url(wsUrl)
+                .header("Sec-WebSocket-Protocol", "binary")
+                .header("Cache-Control", "no-cache")
+                .header("Pragma", "no-cache")
+                .header("Referer", consoleReferer(base, vm, type))
                 .apply { authHeaders.forEach { (k, v) -> header(k, v) } }
                 .build()
 
@@ -116,6 +131,8 @@ class ProxmoxConsole(
             val req = Request.Builder()
                 .url(proxyUrl)
                 .post(RequestBody.create(null, ByteArray(0)))
+                .header("Accept", "application/json")
+                .header("Referer", nodeConsoleReferer(base, node))
                 .apply { authHeaders.forEach { (k, v) -> header(k, v) } }
                 .build()
             client.newCall(req).execute().use { res ->
@@ -138,6 +155,10 @@ class ProxmoxConsole(
         val done = CompletableDeferred<Unit>()
         val req = Request.Builder()
             .url(wsUrl)
+            .header("Sec-WebSocket-Protocol", "binary")
+            .header("Cache-Control", "no-cache")
+            .header("Pragma", "no-cache")
+            .header("Referer", nodeConsoleReferer(base, node))
             .apply { authHeaders.forEach { (k, v) -> header(k, v) } }
             .build()
 
