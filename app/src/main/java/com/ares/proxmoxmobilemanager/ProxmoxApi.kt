@@ -257,15 +257,50 @@ class ProxmoxApi {
             val endpoint = if (vm.isQemu) "qemu" else "lxc"
             val params = "snapname=" + URLEncoder.encode(snapName, "UTF-8") +
                 if (description.isBlank()) "" else "&description=" + URLEncoder.encode(description, "UTF-8")
-            post(base, "/api2/json/nodes/${vm.node}/$endpoint/${vm.vmid}/snapshot", connection, 10000, params)
+            runTaskAndWait(base, connection, vm.node, post(base, "/api2/json/nodes/${vm.node}/$endpoint/${vm.vmid}/snapshot", connection, 10000, params))
         }
     }
 
     private suspend fun postAction(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, action: String) =
         withContext(Dispatchers.IO) {
             val endpoint = if (vm.isQemu) "qemu" else "lxc"
-            post(base, "/api2/json/nodes/${vm.node}/$endpoint/${vm.vmid}/status/$action", connection, 10000)
+            runTaskAndWait(base, connection, vm.node, post(base, "/api2/json/nodes/${vm.node}/$endpoint/${vm.vmid}/status/$action", connection, 10000))
         }
+
+    private suspend fun runTaskAndWait(
+        base: String,
+        connection: ProxmoxConnection,
+        node: String,
+        response: JSONObject
+    ) {
+        val upid = response.optString("data")
+        if (upid.isBlank()) return
+
+        withContext(Dispatchers.IO) {
+            repeat(90) {
+                val encoded = URLEncoder.encode(upid, "UTF-8")
+                val task = request(
+                    base,
+                    "/api2/json/nodes/${URLEncoder.encode(node, "UTF-8")}/tasks/$encoded/status",
+                    connection,
+                    10000
+                )
+                val data = task.optJSONObject("data")
+                val status = data?.optString("status").orEmpty()
+                val exitStatus = data?.optString("exitstatus").orEmpty()
+
+                if (status == "stopped") {
+                    if (exitStatus.isNotBlank() && exitStatus != "OK") {
+                        throw IllegalStateException("Proxmox zadatak nije uspio: $exitStatus")
+                    }
+                    return@withContext
+                }
+
+                Thread.sleep(1000)
+            }
+            throw IllegalStateException("Proxmox zadatak traje predugo (više od 90 sekundi).")
+        }
+    }
 
     private suspend fun post(base: String, path: String, connection: ProxmoxConnection, timeout: Int, formBody: String = ""): JSONObject {
         ensureLocalLogin(base, connection)
