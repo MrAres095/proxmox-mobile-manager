@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -30,10 +31,15 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun ProxmoxApp() {
-    MaterialTheme(colorScheme = darkColorScheme()) {
+    val context = LocalContext.current
+    val uiPrefs = remember { context.getSharedPreferences("ui_preferences", Context.MODE_PRIVATE) }
+    var theme by remember { mutableStateOf(uiPrefs.getString("theme", "system") ?: "system") }
+    val dark = when (theme) { "dark" -> true; "light" -> false; else -> isSystemInDarkTheme() }
+    MaterialTheme(colorScheme = if (dark) darkColorScheme() else lightColorScheme()) {
         Surface(modifier = Modifier.fillMaxSize()) {
             var showSettings by remember { mutableStateOf(true) }
             var showClusterManager by remember { mutableStateOf(false) }
+            var showUiSettings by remember { mutableStateOf(false) }
             var consoleVm by remember { mutableStateOf<ProxmoxVm?>(null) }
             var connectedBase by remember { mutableStateOf<String?>(null) }
             var nodes by remember { mutableStateOf<List<ProxmoxNode>>(emptyList()) }
@@ -53,7 +59,7 @@ fun ProxmoxApp() {
             val scope = rememberCoroutineScope()
 
             if (consoleVm != null && connectedBase != null) { ConsoleScreen(connectedBase!!, connection, consoleVm!!, { console.close(); consoleVm=null }) } else if (showSettings || connectedBase == null) {
-                ConnectionScreen(connection, loading, error, profiles, selectedProfile) { profileName, newConnection ->
+                ConnectionScreen(connection, loading, error, profiles, selectedProfile, onThemeSettings = { showUiSettings = true }) { profileName, newConnection ->
                     selectedProfile = profileName
                     connection = newConnection
                     ProxmoxServerProfiles.save(context, ProxmoxServerProfile(profileName, newConnection))
@@ -165,6 +171,7 @@ fun ProxmoxApp() {
                     error = error,
                     clusterStatus = clusterStatus
                 )
+                if (showUiSettings) { UiSettingsDialog(theme, { theme = it; uiPrefs.edit().putString("theme", it).apply() }, { showUiSettings = false }) }
                 if (showClusterManager) {
                     ClusterManagementDialog(
                         base = connectedBase!!,
@@ -186,12 +193,39 @@ fun ProxmoxApp() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+private fun UiSettingsDialog(theme: String, onTheme: (String) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Izgled aplikacije") },
+        text = {
+            Column {
+                Text("Tema")
+                listOf("system" to "System", "light" to "Light", "dark" to "Dark").forEach { (key, label) ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = theme == key, onClick = { onTheme(key) })
+                        Text(label)
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("Jezik")
+                Text("Hrvatski / English", style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.height(4.dp))
+                Text("Puna lokalizacija zaslona ide u završni jezični sloj; trenutni UI ostaje kompatibilan s postojećim funkcijama.", style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Zatvori") } }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 private fun ConnectionScreen(
     initial: ProxmoxConnection,
     loading: Boolean,
     error: String?,
     profiles: List<ProxmoxServerProfile>,
     selectedProfile: String,
+    onThemeSettings: () -> Unit = {},
     onConnect: (String, ProxmoxConnection) -> Unit
 ) {
     var profileName by remember { mutableStateOf(selectedProfile) }
@@ -205,7 +239,7 @@ private fun ConnectionScreen(
     var secret by remember { mutableStateOf(initial.tokenSecret) }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Proxmox Mobile Manager") }) },
+        topBar = { TopAppBar(title = { Text("Proxmox Mobile Manager") }, actions = { IconButton(onClick = onThemeSettings) { Icon(Icons.Default.Palette, null) } }) },
         bottomBar = {
             Surface(
                 modifier = Modifier.navigationBarsPadding(),
