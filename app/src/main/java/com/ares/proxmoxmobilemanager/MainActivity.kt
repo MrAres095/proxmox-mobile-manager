@@ -199,6 +199,7 @@ private fun ConnectionScreen(
     var remote by remember { mutableStateOf(initial.remoteUrl) }
     var tokenId by remember { mutableStateOf(initial.tokenId) }
     var secret by remember { mutableStateOf(initial.tokenSecret) }
+    val context = LocalContext.current
     var serverName by remember { mutableStateOf("") }
     var savedProfiles by remember { mutableStateOf(loadServerProfiles(context)) }
 
@@ -667,30 +668,6 @@ private fun ClusterJoinDialog(busy:Boolean,onDismiss:()->Unit,onJoin:(String,Str
   Row(verticalAlignment=Alignment.CenterVertically){Checkbox(ok,{ok=it});Text("Potvrđujem da node nema VM/LXC i prihvaćam promjenu konfiguracije.")}
  }},confirmButton={Button(enabled=!busy&&ok&&host.isNotBlank()&&pass.isNotBlank()&&fp.isNotBlank(),onClick={onJoin(host,pass,fp,link0,force)}){Text(if(busy)"Join..." else "Pokreni join")}},dismissButton={TextButton(enabled=!busy,onClick=onDismiss){Text("Odustani")}})
 }
-if (showClusterCreate) {
-        ClusterCreateDialog(clusterBusy, { if (!clusterBusy) showClusterCreate = false }) { name, link0 ->
-            clusterBusy = true
-            scope.launch {
-                try { api.createCluster(base, connection, name, link0); clusterStatus = api.getClusterStatus(base, connection); showClusterCreate = false; actionMessage = "Cluster kreiran." }
-                catch (e: Exception) { actionMessage = e.message ?: "Kreiranje clustera nije uspjelo." }
-                finally { clusterBusy = false }
-            }
-        }
-    }
-    if (showClusterJoin) {
-        ClusterJoinDialog(clusterBusy, { if (!clusterBusy) showClusterJoin = false }) { hostname, password, fingerprint, link0, force ->
-            clusterBusy = true
-            scope.launch {
-                try { api.joinCluster(base, connection, hostname, password, fingerprint, link0, force); showClusterJoin = false; actionMessage = "Join je pokrenut; node se može privremeno odspojiti." }
-                catch (e: Exception) { actionMessage = e.message ?: "Join nije uspio." }
-                finally { clusterBusy = false }
-            }
-        }
-    }
-
-}
-
-
 @Composable
 private fun VmCard(
     vm: ProxmoxVm,
@@ -839,6 +816,32 @@ private fun formatBytes(value: Long): String {
     var i = 0
     while (v >= 1024 && i < units.lastIndex) { v /= 1024; i++ }
     return "${"%.1f".format(v)} ${units[i]}"
+if (showClusterCreate) {
+        ClusterCreateDialog(clusterBusy, { if (!clusterBusy) showClusterCreate = false }) { name, link0 ->
+            clusterBusy = true
+            scope.launch {
+                try { api.createCluster(base, connection, name, link0); clusterStatus = api.getClusterStatus(base, connection); showClusterCreate = false; actionMessage = "Cluster kreiran." }
+                catch (e: Exception) { actionMessage = e.message ?: "Kreiranje clustera nije uspjelo." }
+                finally { clusterBusy = false }
+            }
+        }
+    }
+    if (showClusterJoin) {
+        ClusterJoinDialog(clusterBusy, { if (!clusterBusy) showClusterJoin = false }) { hostname, password, fingerprint, link0, force ->
+            clusterBusy = true
+            scope.launch {
+                try { api.joinCluster(base, connection, hostname, password, fingerprint, link0, force); showClusterJoin = false; actionMessage = "Join je pokrenut; node se može privremeno odspojiti." }
+                catch (e: Exception) { actionMessage = e.message ?: "Join nije uspio." }
+                finally { clusterBusy = false }
+            }
+        }
+    }
+
+}
+
+
+
+
 }
 
 
