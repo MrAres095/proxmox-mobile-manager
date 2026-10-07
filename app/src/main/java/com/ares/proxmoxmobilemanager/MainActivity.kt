@@ -260,6 +260,10 @@ private fun Dashboard(
     var updateChecking by remember { mutableStateOf(false) }
     var updateInstalling by remember { mutableStateOf(false) }
     var updateMessage by remember { mutableStateOf<String?>(null) }
+    var detailsVm by remember { mutableStateOf<ProxmoxVm?>(null) }
+    var detailsConfig by remember { mutableStateOf<ProxmoxVmConfig?>(null) }
+    var detailsLoading by remember { mutableStateOf(false) }
+    var detailsError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         updateChecking = true
@@ -370,7 +374,21 @@ private fun Dashboard(
                 item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() } }
             }
             items(vms, key = { it.node + "-" + it.type + "-" + it.vmid }) { vm ->
-                VmCard(vm, vmLoading, onVmAction, onConsole, onSnapshot)
+                VmCard(vm, vmLoading, onVmAction, onConsole, onSnapshot, onDetails = { selected ->
+                    detailsVm = selected
+                    detailsConfig = null
+                    detailsError = null
+                    detailsLoading = true
+                    scope.launch {
+                        try {
+                            detailsConfig = api.getVmConfig(base, connection, selected)
+                        } catch (e: Exception) {
+                            detailsError = e.message ?: "Konfiguraciju nije moguće učitati."
+                        } finally {
+                            detailsLoading = false
+                        }
+                    }
+                })
             }
             if (!vmLoading && vms.isEmpty()) item { Text("Nema pronađenih VM/LXC resursa.") }
 
@@ -405,6 +423,37 @@ private fun Dashboard(
                 }
             }
         }
+
+        if (detailsVm != null) {
+            val vm = detailsVm!!
+            AlertDialog(
+                onDismissRequest = { if (!detailsLoading) detailsVm = null },
+                title = { Text("${vm.name} • Konfiguracija") },
+                text = {
+                    Column(Modifier.fillMaxWidth()) {
+                        Text("${vm.type.uppercase()} • VMID ${vm.vmid} • ${vm.node}", style = MaterialTheme.typography.bodySmall)
+                        Spacer(Modifier.height(8.dp))
+                        when {
+                            detailsLoading -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
+                            detailsError != null -> Text(detailsError!!, color = MaterialTheme.colorScheme.error)
+                            detailsConfig?.entries?.isEmpty() == true -> Text("Proxmox nije vratio konfiguracijske stavke.")
+                            detailsConfig != null -> LazyColumn(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+                                items(detailsConfig!!.entries, key = { it.first }) { entry ->
+                                    Column(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+                                        Text(entry.first, style = MaterialTheme.typography.labelMedium)
+                                        Text(entry.second.ifBlank { "—" })
+                                    }
+                                    HorizontalDivider()
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { detailsVm = null }, enabled = !detailsLoading) { Text("Zatvori") }
+                }
+            )
+        }
     }
 }
 
@@ -415,7 +464,8 @@ private fun VmCard(
     busy: Boolean,
     onAction: (ProxmoxVm, VmAction) -> Unit,
     onConsole: (ProxmoxVm) -> Unit,
-    onSnapshot: (ProxmoxVm, String, String) -> Unit
+    onSnapshot: (ProxmoxVm, String, String) -> Unit,
+    onDetails: (ProxmoxVm) -> Unit
 ) {
     var confirmAction by remember { mutableStateOf<VmAction?>(null) }
     var showSnapshot by remember { mutableStateOf(false) }
@@ -436,6 +486,8 @@ private fun VmCard(
             if (vm.maxDisk > 0) Text("Disk: " + formatBytes(vm.maxDisk))
             Spacer(Modifier.height(12.dp))
             OutlinedButton({ onConsole(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()){ Icon(Icons.Default.Terminal,null); Spacer(Modifier.width(4.dp)); Text("Console") }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton({ onDetails(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.Tune, null); Spacer(Modifier.width(4.dp)); Text("Detalji / konfiguracija") }
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
                 { showSnapshot = true; snapshotName = ""; snapshotDescription = "" },
