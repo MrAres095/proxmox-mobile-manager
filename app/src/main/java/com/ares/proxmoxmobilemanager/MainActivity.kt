@@ -276,9 +276,6 @@ private fun Dashboard(
     var snapshots by remember { mutableStateOf<List<Pair<String,String>>>(emptyList()) }
     var snapshotsLoading by remember { mutableStateOf(false) }
     var actionMessage by remember { mutableStateOf<String?>(null) }
-    var showClusterCreate by remember { mutableStateOf(false) }
-    var showClusterJoin by remember { mutableStateOf(false) }
-    var clusterBusy by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         updateChecking = true
@@ -577,52 +574,6 @@ private fun Dashboard(
             )
         }
     }
-    
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ClusterCreateDialog(busy:Boolean,onDismiss:()->Unit,onCreate:(String,String)->Unit){
- var name by remember{mutableStateOf("")}; var link0 by remember{mutableStateOf("")}
- AlertDialog(onDismissRequest=onDismiss,title={Text("Kreiraj Proxmox cluster")},text={Column{
-  Text("Naziv clustera se kasnije ne može promijeniti."); Spacer(Modifier.height(8.dp))
-  OutlinedTextField(name,{name=it},Modifier.fillMaxWidth(),label={Text("Naziv")},singleLine=true)
-  Spacer(Modifier.height(8.dp)); OutlinedTextField(link0,{link0=it},Modifier.fillMaxWidth(),label={Text("Link 0 / cluster IP (opcionalno)")},singleLine=true)
- }},confirmButton={Button(enabled=!busy&&name.isNotBlank(),onClick={onCreate(name,link0)}){Text(if(busy)"Kreiranje..." else "Kreiraj")}},dismissButton={TextButton(enabled=!busy,onClick=onDismiss){Text("Odustani")}})
-}
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ClusterJoinDialog(busy:Boolean,onDismiss:()->Unit,onJoin:(String,String,String,String,Boolean)->Unit){
- var host by remember{mutableStateOf("")}; var pass by remember{mutableStateOf("")}; var fp by remember{mutableStateOf("")}; var link0 by remember{mutableStateOf("")}; var confirm by remember{mutableStateOf(false)}; var force by remember{mutableStateOf(false)}
- AlertDialog(onDismissRequest=onDismiss,title={Text("Join node u cluster")},text={Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())){
-  Text("PAŽNJA: Proxmox pri joinu prepisuje postojeću /etc/pve konfiguraciju. Node koji se pridružuje ne smije imati postojeće VM/LXC goste.")
-  Spacer(Modifier.height(8.dp)); OutlinedTextField(host,{host=it},Modifier.fillMaxWidth(),label={Text("IP/hostname cluster nodea")},singleLine=true)
-  Spacer(Modifier.height(8.dp)); OutlinedTextField(pass,{pass=it},Modifier.fillMaxWidth(),label={Text("Cluster root lozinka")},singleLine=true,visualTransformation=androidx.compose.ui.text.input.PasswordVisualTransformation())
-  Spacer(Modifier.height(8.dp)); OutlinedTextField(fp,{fp=it},Modifier.fillMaxWidth(),label={Text("TLS fingerprint")},singleLine=true)
-  Spacer(Modifier.height(8.dp)); OutlinedTextField(link0,{link0=it},Modifier.fillMaxWidth(),label={Text("Link 0 (opcionalno)")},singleLine=true)
-  Row(verticalAlignment=Alignment.CenterVertically){Checkbox(force,{force=it});Text("Force")}
-  Row(verticalAlignment=Alignment.CenterVertically){Checkbox(confirm,{confirm=it});Text("Potvrđujem da je node bez VM/LXC i prihvaćam promjenu konfiguracije.")}
- }},confirmButton={Button(enabled=!busy&&confirm&&host.isNotBlank()&&pass.isNotBlank()&&fp.isNotBlank(),onClick={onJoin(host,pass,fp,link0,force)}){Text(if(busy)"Join..." else "Pokreni join")}},dismissButton={TextButton(enabled=!busy,onClick=onDismiss){Text("Odustani")}})
-}
-if (showClusterCreate) {
-        ClusterCreateDialog(clusterBusy, { if (!clusterBusy) showClusterCreate = false }) { name, link0 ->
-            clusterBusy = true
-            scope.launch {
-                try { api.createCluster(base, connection, name, link0); clusterStatus = api.getClusterStatus(base, connection); showClusterCreate = false; actionMessage = "Cluster kreiran." }
-                catch (e: Exception) { actionMessage = e.message ?: "Kreiranje clustera nije uspjelo." }
-                finally { clusterBusy = false }
-            }
-        }
-    }
-    if (showClusterJoin) {
-        ClusterJoinDialog(clusterBusy, { if (!clusterBusy) showClusterJoin = false }) { hostname, password, fingerprint, link0, force ->
-            clusterBusy = true
-            scope.launch {
-                try { api.joinCluster(base, connection, hostname, password, fingerprint, link0, force); showClusterJoin = false; actionMessage = "Join je pokrenut; veza s nodeom može se privremeno prekinuti." }
-                catch (e: Exception) { actionMessage = e.message ?: "Join nije uspio." }
-                finally { clusterBusy = false }
-            }
-        }
-    }
-
 }
 
 
