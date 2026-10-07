@@ -458,8 +458,8 @@ private fun Dashboard(
                 LazyColumn(Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
                     val editable = listOf("name","cores","sockets","memory","balloon","onboot","boot","cpuunits","ostype","net0")
                     items(editable) { key ->
-                        var value by remember(config[key]) { mutableStateOf(config[key].orEmpty()) }
-                        OutlinedTextField(value, { value = it; config = config + (key to it) },
+                        val value = config[key].orEmpty()
+                        OutlinedTextField(value, { newValue -> config = config + (key to newValue) },
                             modifier=Modifier.fillMaxWidth().padding(vertical=3.dp),
                             label={Text(key)}, singleLine=true)
                     }
@@ -497,10 +497,10 @@ private fun Dashboard(
                         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
                             Column(Modifier.weight(1f)){Text(snap.first); if(snap.second.isNotBlank())Text(snap.second,style=MaterialTheme.typography.bodySmall)}
                             TextButton(onClick={
-                                scope.launch { try { api.rollbackSnapshot(base,connection,vm,snap.first); snapshots=api.getSnapshots(base,connection); actionMessage="Snapshot vraćen." } catch(e:Exception){actionMessage=e.message ?: "Rollback nije uspio."} }
+                                scope.launch { try { api.rollbackSnapshot(base,connection,vm,snap.first); snapshots=api.getSnapshots(base,connection,vm); actionMessage="Snapshot vraćen." } catch(e:Exception){actionMessage=e.message ?: "Rollback nije uspio."} }
                             }){Text("Vrati")}
                             TextButton(onClick={
-                                scope.launch { try { api.deleteSnapshot(base,connection,vm,snap.first); snapshots=api.getSnapshots(base,connection); actionMessage="Snapshot obrisan." } catch(e:Exception){actionMessage=e.message ?: "Brisanje nije uspjelo."} }
+                                scope.launch { try { api.deleteSnapshot(base,connection,vm,snap.first); snapshots=api.getSnapshots(base,connection,vm); actionMessage="Snapshot obrisan." } catch(e:Exception){actionMessage=e.message ?: "Brisanje nije uspjelo."} }
                             }){Text("Obriši")}
                         }
                         Divider()
