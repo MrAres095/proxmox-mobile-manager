@@ -106,7 +106,7 @@ class ProxmoxConsole(
                 .header("Sec-WebSocket-Protocol", "binary")
                 .header("Cache-Control", "no-cache")
                 .header("Pragma", "no-cache")
-                .header("Referer", consoleReferer(base, vm, type))
+                .header("Referer", consoleReferer(base, vm))
                 .apply { authHeaders.forEach { (k, v) -> header(k, v) } }
                 .build()
 
