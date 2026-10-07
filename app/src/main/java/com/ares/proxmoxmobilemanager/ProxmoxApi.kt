@@ -50,6 +50,14 @@ data class ProxmoxVmConfig(
     val entries: List<Pair<String, String>>
 )
 
+data class ProxmoxClusterStatus(
+    val clustered: Boolean,
+    val name: String,
+    val version: String,
+    val quorate: Boolean,
+    val nodes: List<Pair<String, String>>
+ )
+
 data class ProxmoxVm(
     val node: String,
     val vmid: Int,
@@ -175,6 +183,27 @@ class ProxmoxApi {
             nodes.map { it.node + ":" + it.maxCpu }.sorted().joinToString("|")
         }
 
+    suspend fun getClusterStatus(base: String, connection: ProxmoxConnection): ProxmoxClusterStatus =
+        withContext(Dispatchers.IO) {
+            val json = request(base, "/api2/json/cluster/status", connection, 7000)
+            val data = json.optJSONArray("data") ?: return@withContext ProxmoxClusterStatus(false, "", "", true, emptyList())
+            var clusterName = ""
+            var version = ""
+            var quorate = true
+            val members = mutableListOf<Pair<String, String>>()
+            for (i in 0 until data.length()) {
+                val item = data.getJSONObject(i)
+                when (item.optString("type")) {
+                    "cluster" -> {
+                        clusterName = item.optString("name")
+                        version = item.optString("version")
+                        quorate = item.optBoolean("quorate", true)
+                    }
+                    "node" -> members += item.optString("name") to item.optString("online", "0")
+                }
+            }
+            ProxmoxClusterStatus(clusterName.isNotBlank(), clusterName, version, quorate, members)
+        }
     suspend fun getNodes(base: String, connection: ProxmoxConnection): List<ProxmoxNode> =
         withContext(Dispatchers.IO) {
             val json = request(base, "/api2/json/nodes", connection, 7000)
