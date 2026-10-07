@@ -119,17 +119,6 @@ fun ProxmoxApp() {
                     },
                     onSettings = { showSettings = true },
                     onConsole = { consoleVm = it },
-                    onEditConfig = { editVm = it },
-                    onSnapshots = { vm ->
-                        snapshotsVm = vm
-                        snapshots = emptyList()
-                        snapshotsLoading = true
-                        scope.launch {
-                            try { snapshots = api.getSnapshots(base, connection, vm) }
-                            catch (e: Exception) { actionMessage = e.message ?: "Snapshoti se ne mogu učitati." }
-                            finally { snapshotsLoading = false }
-                        }
-                    },
                     onSnapshot = { vm, snapName, description ->
                         vmLoading = true
                         scope.launch {
@@ -261,8 +250,6 @@ private fun Dashboard(
     onSettings: () -> Unit,
     onConsole: (ProxmoxVm) -> Unit,
     onSnapshot: (ProxmoxVm, String, String) -> Unit,
-    onEditConfig: (ProxmoxVm) -> Unit,
-    onSnapshots: (ProxmoxVm) -> Unit,
     onUpdateAll: () -> Unit,
     updateAllBusy: Boolean,
     updateStatuses: Map<String, String>,
@@ -394,7 +381,18 @@ private fun Dashboard(
                 item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() } }
             }
             items(vms, key = { it.node + "-" + it.type + "-" + it.vmid }) { vm ->
-                VmCard(vm, vmLoading, onVmAction, onConsole, onSnapshot, onEditConfig, onSnapshots, onDetails = { selected ->
+                VmCard(vm, vmLoading, onVmAction, onConsole, onSnapshot, onEditConfig = { selected ->
+                    editVm = selected
+                }, onSnapshots = { selected ->
+                    snapshotsVm = selected
+                    snapshots = emptyList()
+                    snapshotsLoading = true
+                    scope.launch {
+                        try { snapshots = api.getSnapshots(base, connection, selected) }
+                        catch (e: Exception) { actionMessage = e.message ?: "Snapshoti se ne mogu učitati." }
+                        finally { snapshotsLoading = false }
+                    }
+                }, onDetails = { selected ->
                     detailsVm = selected
                     detailsConfig = null
                     detailsError = null
