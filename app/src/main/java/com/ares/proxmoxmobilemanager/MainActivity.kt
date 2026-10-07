@@ -30,7 +30,12 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun ProxmoxApp() {
-    MaterialTheme(colorScheme = darkColorScheme()) {
+    val context = LocalContext.current
+    val uiPrefs = remember { context.getSharedPreferences("ui_settings", Context.MODE_PRIVATE) }
+    var themeMode by remember { mutableStateOf(uiPrefs.getString("theme", "system") ?: "system") }
+    var language by remember { mutableStateOf(uiPrefs.getString("language", "hr") ?: "hr") }
+    val dark = when (themeMode) { "dark" -> true; "light" -> false; else -> androidx.compose.foundation.isSystemInDarkTheme() }
+    MaterialTheme(colorScheme = if (dark) darkColorScheme() else lightColorScheme()) {
         Surface(modifier = Modifier.fillMaxSize()) {
             var showSettings by remember { mutableStateOf(true) }
             var consoleVm by remember { mutableStateOf<ProxmoxVm?>(null) }
@@ -44,13 +49,12 @@ fun ProxmoxApp() {
             var error by remember { mutableStateOf<String?>(null) }
             var updatingAll by remember { mutableStateOf(false) }
             var updateStatuses by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-            val context = LocalContext.current
             val prefs = remember { context.getSharedPreferences("proxmox_connection", Context.MODE_PRIVATE) }
             var connection by remember { mutableStateOf(ProxmoxConnection(prefs.getString("localUrl", "") ?: "", prefs.getString("remoteUrl", "") ?: "", prefs.getString("username", "") ?: "", prefs.getString("password", "") ?: "", prefs.getString("tokenId", "") ?: "", prefs.getString("tokenSecret", "") ?: "")) }
             val scope = rememberCoroutineScope()
 
             if (consoleVm != null && connectedBase != null) { ConsoleScreen(connectedBase!!, connection, consoleVm!!, { console.close(); consoleVm=null }) } else if (showSettings || connectedBase == null) {
-                ConnectionScreen(connection, loading, error) { newConnection ->
+                ConnectionScreen(connection, loading, error, language, themeMode, { lang -> language = lang; uiPrefs.edit().putString("language", lang).apply() }, { mode -> themeMode = mode; uiPrefs.edit().putString("theme", mode).apply() }) { newConnection ->
                     connection = newConnection
                     prefs.edit().putString("localUrl", newConnection.localUrl).putString("remoteUrl", newConnection.remoteUrl).putString("username", newConnection.username).putString("password", newConnection.password).putString("tokenId", newConnection.tokenId).putString("tokenSecret", newConnection.tokenSecret).apply()
                     loading = true
@@ -169,6 +173,10 @@ private fun ConnectionScreen(
     initial: ProxmoxConnection,
     loading: Boolean,
     error: String?,
+    language: String,
+    themeMode: String,
+    onLanguageChange: (String) -> Unit,
+    onThemeChange: (String) -> Unit,
     onConnect: (ProxmoxConnection) -> Unit
 ) {
     var local by remember { mutableStateOf(initial.localUrl.removePrefix("https://").removePrefix("http://").substringBefore(":8006")) }
@@ -235,6 +243,19 @@ private fun ConnectionScreen(
             OutlinedTextField(secret, { secret = it }, Modifier.fillMaxWidth(), label = { Text("API token secret") }, singleLine = true, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
             Spacer(Modifier.height(18.dp))
             if (error != null) { Text(error, color = MaterialTheme.colorScheme.error); Spacer(Modifier.height(12.dp)) }
+            Spacer(Modifier.height(18.dp))
+            Text(if (language == "hr") "Izgled i jezik" else "Appearance & language", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { onLanguageChange("hr") }, enabled = language != "hr") { Text("Hrvatski") }
+                Button(onClick = { onLanguageChange("en") }, enabled = language != "en") { Text("English") }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { onThemeChange("light") }, enabled = themeMode != "light") { Text(if (language == "hr") "Svijetla" else "Light") }
+                Button(onClick = { onThemeChange("dark") }, enabled = themeMode != "dark") { Text(if (language == "hr") "Tamna" else "Dark") }
+                OutlinedButton(onClick = { onThemeChange("system") }, enabled = themeMode != "system") { Text(if (language == "hr") "Sustav" else "System") }
+            }
 
         }
     }
