@@ -223,6 +223,20 @@ class ProxmoxApi {
         }
     }
 
+    suspend fun getClusterStatus(base: String, connection: ProxmoxConnection): ProxmoxClusterStatus =
+        withContext(Dispatchers.IO) {
+            val json = request(base, "/api2/json/cluster/status", connection, 7000)
+            val data = json.optJSONArray("data") ?: return@withContext ProxmoxClusterStatus(false, "", "", true, emptyList())
+            var name = ""; var version = ""; var quorate = true
+            val nodes = mutableListOf<Pair<String, String>>()
+            for (i in 0 until data.length()) {
+                val item = data.getJSONObject(i)
+                if (item.optString("type") == "cluster") { name=item.optString("name"); version=item.optString("version"); quorate=item.optBoolean("quorate", true) }
+                if (item.optString("type") == "node") nodes += item.optString("name") to item.optString("online", "0")
+            }
+            ProxmoxClusterStatus(name.isNotBlank(), name, version, quorate, nodes)
+        }
+
     suspend fun getNodes(base: String, connection: ProxmoxConnection): List<ProxmoxNode> =
         withContext(Dispatchers.IO) {
             val json = request(base, "/api2/json/nodes", connection, 7000)
