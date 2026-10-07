@@ -303,7 +303,42 @@ private fun ConnectionScreen(
             }
 
         }
+    }if (showClusterCreate) {
+        ClusterCreateDialog(clusterBusy, { if (!clusterBusy) showClusterCreate = false }) { name, link0 ->
+            clusterBusy = true
+            scope.launch {
+                try { api.createCluster(base, connection, name, link0); clusterStatus = api.getClusterStatus(base, connection); showClusterCreate = false; actionMessage = "Cluster kreiran." }
+                catch (e: Exception) { actionMessage = e.message ?: "Kreiranje clustera nije uspjelo." }
+                finally { clusterBusy = false }
+            }
+        }
     }
+    if (showClusterJoin) {
+        ClusterJoinDialog(clusterBusy, { if (!clusterBusy) showClusterJoin = false }) { hostname, password, fingerprint, link0, force ->
+            clusterBusy = true
+            scope.launch {
+                try { api.joinCluster(base, connection, hostname, password, fingerprint, link0, force); showClusterJoin = false; actionMessage = "Join je pokrenut; node se može privremeno odspojiti." }
+                catch (e: Exception) { actionMessage = e.message ?: "Join nije uspio." }
+                finally { clusterBusy = false }
+            }
+        }
+    }
+
+}
+
+
+
+
+}
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,onBack:()->Unit){
+ val scope=rememberCoroutineScope(); var output by remember{mutableStateOf("Spajanje na Proxmox konzolu...\n")}; var input by remember{mutableStateOf("")}; var connected by remember{mutableStateOf(false)}; var error by remember{mutableStateOf<String?>(null)}
+ DisposableEffect(vm){ scope.launch{try{console.open(base,connection,vm,{b->val t=String(b,Charsets.UTF_8);if(t=="OK")connected=true else output=(output+t).takeLast(30000)},{reason->connected=false;output+="\n[Veza zatvorena"+(reason?.let{": "+it}?: "")+"]\n"},{e->connected=false;error=e.message?:"Greška konzole"})}catch(e:Exception){error=e.message?:"Spajanje na konzolu nije uspjelo."}};onDispose{console.close()} }
+ Scaffold(topBar={TopAppBar(title={Text(vm.name+" • Console")},navigationIcon={IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,"Natrag")}},actions={Text(if(connected)"● LIVE" else "○ povezivanje",Modifier.padding(end=12.dp))})}){p->Column(Modifier.fillMaxSize().padding(p).padding(8.dp)){Surface(Modifier.fillMaxWidth().weight(1f)){Text(output,Modifier.fillMaxSize().padding(8.dp),style=MaterialTheme.typography.bodySmall)};if(error!=null)Text(error!!,color=MaterialTheme.colorScheme.error);Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){OutlinedTextField(input,{input=it},Modifier.weight(1f),label={Text("Unos")},singleLine=true,enabled=connected);Spacer(Modifier.width(6.dp));Button({console.send(input+"\n");input=""},enabled=connected&&input.isNotEmpty()){Text("Pošalji")}};Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){TextButton({console.send("\u0003")},enabled=connected){Text("Ctrl+C")};TextButton({console.send("\u0004")},enabled=connected){Text("Ctrl+D")};TextButton({console.send("\t")},enabled=connected){Text("Tab")};TextButton({console.send("\u001b[A")},enabled=connected){Text("↑")};TextButton({console.send("\u001b[B")},enabled=connected){Text("↓")}}}}}
+
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -807,6 +842,8 @@ private fun VmCard(
     }
 }
 
+}
+
 private enum class VmAction { START, STOP, REBOOT, SHUTDOWN, RESET }
 
 private fun formatBytes(value: Long): String {
@@ -816,38 +853,4 @@ private fun formatBytes(value: Long): String {
     var i = 0
     while (v >= 1024 && i < units.lastIndex) { v /= 1024; i++ }
     return "${"%.1f".format(v)} ${units[i]}"
-if (showClusterCreate) {
-        ClusterCreateDialog(clusterBusy, { if (!clusterBusy) showClusterCreate = false }) { name, link0 ->
-            clusterBusy = true
-            scope.launch {
-                try { api.createCluster(base, connection, name, link0); clusterStatus = api.getClusterStatus(base, connection); showClusterCreate = false; actionMessage = "Cluster kreiran." }
-                catch (e: Exception) { actionMessage = e.message ?: "Kreiranje clustera nije uspjelo." }
-                finally { clusterBusy = false }
-            }
-        }
-    }
-    if (showClusterJoin) {
-        ClusterJoinDialog(clusterBusy, { if (!clusterBusy) showClusterJoin = false }) { hostname, password, fingerprint, link0, force ->
-            clusterBusy = true
-            scope.launch {
-                try { api.joinCluster(base, connection, hostname, password, fingerprint, link0, force); showClusterJoin = false; actionMessage = "Join je pokrenut; node se može privremeno odspojiti." }
-                catch (e: Exception) { actionMessage = e.message ?: "Join nije uspio." }
-                finally { clusterBusy = false }
-            }
-        }
-    }
 
-}
-
-
-
-
-}
-
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,onBack:()->Unit){
- val scope=rememberCoroutineScope(); var output by remember{mutableStateOf("Spajanje na Proxmox konzolu...\n")}; var input by remember{mutableStateOf("")}; var connected by remember{mutableStateOf(false)}; var error by remember{mutableStateOf<String?>(null)}
- DisposableEffect(vm){ scope.launch{try{console.open(base,connection,vm,{b->val t=String(b,Charsets.UTF_8);if(t=="OK")connected=true else output=(output+t).takeLast(30000)},{reason->connected=false;output+="\n[Veza zatvorena"+(reason?.let{": "+it}?: "")+"]\n"},{e->connected=false;error=e.message?:"Greška konzole"})}catch(e:Exception){error=e.message?:"Spajanje na konzolu nije uspjelo."}};onDispose{console.close()} }
- Scaffold(topBar={TopAppBar(title={Text(vm.name+" • Console")},navigationIcon={IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,"Natrag")}},actions={Text(if(connected)"● LIVE" else "○ povezivanje",Modifier.padding(end=12.dp))})}){p->Column(Modifier.fillMaxSize().padding(p).padding(8.dp)){Surface(Modifier.fillMaxWidth().weight(1f)){Text(output,Modifier.fillMaxSize().padding(8.dp),style=MaterialTheme.typography.bodySmall)};if(error!=null)Text(error!!,color=MaterialTheme.colorScheme.error);Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){OutlinedTextField(input,{input=it},Modifier.weight(1f),label={Text("Unos")},singleLine=true,enabled=connected);Spacer(Modifier.width(6.dp));Button({console.send(input+"\n");input=""},enabled=connected&&input.isNotEmpty()){Text("Pošalji")}};Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){TextButton({console.send("\u0003")},enabled=connected){Text("Ctrl+C")};TextButton({console.send("\u0004")},enabled=connected){Text("Ctrl+D")};TextButton({console.send("\t")},enabled=connected){Text("Tab")};TextButton({console.send("\u001b[A")},enabled=connected){Text("↑")};TextButton({console.send("\u001b[B")},enabled=connected){Text("↓")}}}}}
