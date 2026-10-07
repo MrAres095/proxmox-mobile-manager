@@ -216,6 +216,11 @@ class ProxmoxApi {
         requestWrite(base, "/api2/json/cluster/config/join", connection, "POST", 20000, parts.joinToString("&"))
     }
 
+    suspend fun getClusterJoinInfo(base: String, connection: ProxmoxConnection): JSONObject =
+        withContext(Dispatchers.IO) {
+            request(base, "/api2/json/cluster/config/join", connection, 7000).optJSONObject("data") ?: JSONObject()
+        }
+
     suspend fun getNodes(base: String, connection: ProxmoxConnection): List<ProxmoxNode> =
         withContext(Dispatchers.IO) {
             val json = request(base, "/api2/json/nodes", connection, 7000)
