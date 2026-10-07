@@ -472,7 +472,6 @@ private fun Dashboard(
                         try {
                             val editable=listOf("name","cores","sockets","memory","balloon","onboot","boot","cpuunits","ostype","net0")
                             for(key in editable) if(config.containsKey(key)) api.updateVmConfig(base,connection,vm,key,config[key].orEmpty())
-                            vms=api.getVms(base,connection)
                             actionMessage="Konfiguracija spremljena."
                             editVm=null
                         } catch(e:Exception) { actionMessage=e.message ?: "Spremanje nije uspjelo." }
