@@ -205,15 +205,15 @@ class ProxmoxApi {
             ProxmoxClusterStatus(clusterName.isNotBlank(), clusterName, version, quorate, members)
         }
     suspend fun createCluster(base: String, connection: ProxmoxConnection, name: String, link0: String = "") = withContext(Dispatchers.IO) {
-        val form = "name=" + URLEncoder.encode(name.trim(), "UTF-8") + if (link0.isBlank()) "" else "&link0=" + URLEncoder.encode(link0.trim(), "UTF-8")
-        post(base, "/api2/json/cluster/config", connection, 15000, form)
+        val form = "clustername=" + URLEncoder.encode(name.trim(), "UTF-8")
+        requestWrite(base, "/api2/json/cluster/config", connection, "POST", 15000, form)
     }
 
     suspend fun joinCluster(base: String, connection: ProxmoxConnection, hostname: String, password: String, fingerprint: String, link0: String = "", force: Boolean = false) = withContext(Dispatchers.IO) {
         val parts = mutableListOf("hostname="+URLEncoder.encode(hostname.trim(),"UTF-8"),"password="+URLEncoder.encode(password,"UTF-8"),"fingerprint="+URLEncoder.encode(fingerprint.trim(),"UTF-8"))
         if(link0.isNotBlank()) parts += "link0="+URLEncoder.encode(link0.trim(),"UTF-8")
         if(force) parts += "force=1"
-        post(base, "/api2/json/cluster/config/join", connection, 20000, parts.joinToString("&"))
+        requestWrite(base, "/api2/json/cluster/config/join", connection, "POST", 20000, parts.joinToString("&"))
     }
 
     suspend fun getNodes(base: String, connection: ProxmoxConnection): List<ProxmoxNode> =
