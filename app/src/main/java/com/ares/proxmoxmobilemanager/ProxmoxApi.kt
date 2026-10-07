@@ -183,27 +183,46 @@ class ProxmoxApi {
             nodes.map { it.node + ":" + it.maxCpu }.sorted().joinToString("|")
         }
 
-    suspend fun getClusterStatus(base: String, connection: ProxmoxConnection): ProxmoxClusterStatus =
+    suspend fun createCluster(base: String, connection: ProxmoxConnection, name: String, link0: String = "") {
         withContext(Dispatchers.IO) {
-            val json = request(base, "/api2/json/cluster/status", connection, 7000)
-            val data = json.optJSONArray("data") ?: return@withContext ProxmoxClusterStatus(false, "", "", true, emptyList())
-            var clusterName = ""
-            var version = ""
-            var quorate = true
-            val members = mutableListOf<Pair<String, String>>()
-            for (i in 0 until data.length()) {
-                val item = data.getJSONObject(i)
-                when (item.optString("type")) {
-                    "cluster" -> {
-                        clusterName = item.optString("name")
-                        version = item.optString("version")
-                        quorate = item.optBoolean("quorate", true)
-                    }
-                    "node" -> members += item.optString("name") to item.optString("online", "0")
-                }
-            }
-            ProxmoxClusterStatus(clusterName.isNotBlank(), clusterName, version, quorate, members)
+            val form = "name=" + URLEncoder.encode(name.trim(), "UTF-8") +
+                if (link0.isBlank()) "" else "&link0=" + URLEncoder.encode(link0.trim(), "UTF-8")
+            post(base, "/api2/json/cluster/config", connection, 15000, form)
         }
+    }
+
+    suspend fun getClusterJoinInfo(base: String, connection: ProxmoxConnection): Map<String, String> =
+        withContext(Dispatchers.IO) {
+            val json = request(base, "/api2/json/cluster/config/join", connection, 10000)
+            val data = json.optJSONObject("data") ?: return@withContext emptyMap()
+            buildMap {
+                data.keys().forEach { key -> put(key, data.optString(key)) }
+            }
+        }
+
+    suspend fun joinCluster(
+        base: String,
+        connection: ProxmoxConnection,
+        hostname: String,
+        password: String,
+        fingerprint: String,
+        link0: String = "",
+        force: Boolean = false
+    ) {
+        withContext(Dispatchers.IO) {
+            val parts = mutableListOf(
+                "hostname=" + URLEncoder.encode(hostname.trim(), "UTF-8"),
+                "password=" + URLEncoder.encode(password, "UTF-8"),
+                "fingerprint=" + URLEncoder.encode(fingerprint.trim(), "UTF-8")
+            )
+            if (link0.isNotBlank()) parts += "link0=" + URLEncoder.encode(link0.trim(), "UTF-8")
+            if (force) parts += "force=1"
+            val result = post(base, "/api2/json/cluster/config/join", connection, 20000, parts.joinToString("&"))
+            val upid = result.optString("data")
+            if (upid.isNotBlank()) runTaskAndWait(base, connection, hostname, result)
+        }
+    }
+
     suspend fun getNodes(base: String, connection: ProxmoxConnection): List<ProxmoxNode> =
         withContext(Dispatchers.IO) {
             val json = request(base, "/api2/json/nodes", connection, 7000)
