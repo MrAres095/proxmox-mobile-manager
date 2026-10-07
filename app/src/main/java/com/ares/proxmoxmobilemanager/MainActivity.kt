@@ -40,6 +40,7 @@ fun ProxmoxApp() {
             var showSettings by remember { mutableStateOf(true) }
             var showClusterManager by remember { mutableStateOf(false) }
             var showUiSettings by remember { mutableStateOf(false) }
+            var language by remember { mutableStateOf(uiPrefs.getString("language", "hr") ?: "hr") }
             var consoleVm by remember { mutableStateOf<ProxmoxVm?>(null) }
             var connectedBase by remember { mutableStateOf<String?>(null) }
             var nodes by remember { mutableStateOf<List<ProxmoxNode>>(emptyList()) }
@@ -171,7 +172,7 @@ fun ProxmoxApp() {
                     error = error,
                     clusterStatus = clusterStatus
                 )
-                if (showUiSettings) { UiSettingsDialog(theme, { theme = it; uiPrefs.edit().putString("theme", it).apply() }, { showUiSettings = false }) }
+                if (showUiSettings) { UiSettingsDialog(theme, language, { theme = it; uiPrefs.edit().putString("theme", it).apply() }, { language = it; uiPrefs.edit().putString("language", it).apply() }, { showUiSettings = false }) }
                 if (showClusterManager) {
                     ClusterManagementDialog(
                         base = connectedBase!!,
@@ -193,7 +194,7 @@ fun ProxmoxApp() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun UiSettingsDialog(theme: String, onTheme: (String) -> Unit, onDismiss: () -> Unit) {
+private fun UiSettingsDialog(theme: String, language: String, onTheme: (String) -> Unit, onLanguage: (String) -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Izgled aplikacije") },
@@ -208,9 +209,15 @@ private fun UiSettingsDialog(theme: String, onTheme: (String) -> Unit, onDismiss
                 }
                 Spacer(Modifier.height(12.dp))
                 Text("Jezik")
-                Text("Hrvatski / English", style = MaterialTheme.typography.bodySmall)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = language == "hr", onClick = { onLanguage("hr") })
+                    Text("Hrvatski")
+                    Spacer(Modifier.width(8.dp))
+                    RadioButton(selected = language == "en", onClick = { onLanguage("en") })
+                    Text("English")
+                }
                 Spacer(Modifier.height(4.dp))
-                Text("Puna lokalizacija zaslona ide u završni jezični sloj; trenutni UI ostaje kompatibilan s postojećim funkcijama.", style = MaterialTheme.typography.bodySmall)
+                Text(if (language == "hr") "Jezik će se primijeniti na aplikacijski UI." else "Language will be applied to the app UI.", style = MaterialTheme.typography.bodySmall)
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Zatvori") } }
