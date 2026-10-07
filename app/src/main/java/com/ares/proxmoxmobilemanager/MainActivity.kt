@@ -443,7 +443,7 @@ private fun Dashboard(
                                         Text(entry.first, style = MaterialTheme.typography.labelMedium)
                                         Text(entry.second.ifBlank { "—" })
                                     }
-                                    HorizontalDivider()
+                                    Divider()
                                 }
                             }
                         }
