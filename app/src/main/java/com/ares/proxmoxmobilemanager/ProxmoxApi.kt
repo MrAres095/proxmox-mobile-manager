@@ -234,11 +234,7 @@ class ProxmoxApi {
             val keys = data.keys().asSequence().toList().sorted()
             ProxmoxVmConfig(keys.map { key ->
                 val value = data.opt(key)
-                key to when (value) {
-                    null -> ""
-                    value == org.json.JSONObject.NULL -> ""
-                    else -> value.toString()
-                }
+                key to if (value == null || value == org.json.JSONObject.NULL) "" else value.toString()
             })
         }
 
