@@ -33,6 +33,7 @@ fun ProxmoxApp() {
     MaterialTheme(colorScheme = darkColorScheme()) {
         Surface(modifier = Modifier.fillMaxSize()) {
             var showSettings by remember { mutableStateOf(true) }
+            var showClusterManager by remember { mutableStateOf(false) }
             var consoleVm by remember { mutableStateOf<ProxmoxVm?>(null) }
             var connectedBase by remember { mutableStateOf<String?>(null) }
             var nodes by remember { mutableStateOf<List<ProxmoxNode>>(emptyList()) }
@@ -121,6 +122,7 @@ fun ProxmoxApp() {
                         }
                     },
                     onSettings = { showSettings = true },
+                    onClusterManager = { showClusterManager = true },
                     onConsole = { consoleVm = it },
                     onSnapshot = { vm, snapName, description ->
                         vmLoading = true
@@ -158,6 +160,20 @@ fun ProxmoxApp() {
                     error = error,
                     clusterStatus = clusterStatus
                 )
+                if (showClusterManager) {
+                    ClusterManagementDialog(
+                        base = connectedBase!!,
+                        connection = connection,
+                        clusterStatus = clusterStatus,
+                        onDismiss = { showClusterManager = false },
+                        onChanged = {
+                            scope.launch {
+                                try { clusterStatus = api.getClusterStatus(connectedBase!!, connection) }
+                                catch (_: Exception) { }
+                            }
+                        }
+                    )
+                }
             }
         }
     }
@@ -241,6 +257,98 @@ private fun ConnectionScreen(
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+private fun ClusterManagementDialog(
+    base: String,
+    connection: ProxmoxConnection,
+    clusterStatus: ProxmoxClusterStatus?,
+    onDismiss: () -> Unit,
+    onChanged: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    var mode by remember { mutableStateOf("create") }
+    var clusterName by remember { mutableStateOf("") }
+    var hostname by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var fingerprint by remember { mutableStateOf("") }
+    var link0 by remember { mutableStateOf("") }
+    var loading by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var confirm by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = { if (!loading) onDismiss() },
+        title = { Text(if (mode == "create") "Kreiraj Proxmox cluster" else "Pridruži node postojećem clusteru") },
+        text = {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = mode == "create", onClick = { mode = "create" }, label = { Text("Kreiraj") })
+                    FilterChip(selected = mode == "join", onClick = { mode = "join" }, label = { Text("Join") })
+                }
+                Spacer(Modifier.height(10.dp))
+                if (mode == "create") {
+                    OutlinedTextField(clusterName, { clusterName = it }, Modifier.fillMaxWidth(), label = { Text("Naziv clustera") }, singleLine = true)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Kreiranje clustera mijenja Proxmox cluster konfiguraciju. Koristi ga samo na nodeu koji treba postati prvi član.", style = MaterialTheme.typography.bodySmall)
+                } else {
+                    OutlinedTextField(hostname, { hostname = it }, Modifier.fillMaxWidth(), label = { Text("IP / hostname postojećeg clustera") }, singleLine = true)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(password, { password = it }, Modifier.fillMaxWidth(), label = { Text("Lozinka root@pam na clusteru") }, singleLine = true, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(fingerprint, { fingerprint = it }, Modifier.fillMaxWidth(), label = { Text("PVE SSL fingerprint") }, singleLine = false)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(link0, { link0 = it }, Modifier.fillMaxWidth(), label = { Text("Link0 (opcionalno)") }, singleLine = true)
+                    Spacer(Modifier.height(8.dp))
+                    Text("VAŽNO: node koji pridružuješ clusteru ne smije sadržavati postojeće goste koje želiš zadržati. Join može promijeniti /etc/pve konfiguraciju i prekinuti trenutnu sesiju.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                if (message != null) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(message!!, color = if (message!!.startsWith("Uspješno")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = !loading && if (mode == "create") clusterName.isNotBlank() else hostname.isNotBlank() && password.isNotBlank() && fingerprint.isNotBlank(),
+                onClick = { confirm = true }
+            ) { Text(if (loading) "Radim..." else if (mode == "create") "Kreiraj" else "Pridruži") }
+        },
+        dismissButton = { TextButton(enabled = !loading, onClick = onDismiss) { Text("Odustani") } }
+    )
+
+    if (confirm) {
+        AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { Text("Potvrdi opasnu operaciju") },
+            text = { Text(if (mode == "create") "Kreiranje clustera je trajna administratorska operacija. Nastaviti?" else "Join može promijeniti cluster konfiguraciju i prekinuti rad ciljnog nodea. Potvrdi samo ako je ovaj node spreman za pridruživanje.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirm = false
+                    loading = true
+                    message = null
+                    scope.launch {
+                        try {
+                            if (mode == "create") {
+                                api.createCluster(base, connection, clusterName)
+                            } else {
+                                api.joinCluster(base, connection, hostname, password, fingerprint, link0)
+                            }
+                            message = "Uspješno. Osvježavam cluster status..."
+                            onChanged()
+                        } catch (e: Exception) {
+                            message = e.message ?: "Cluster operacija nije uspjela."
+                        } finally {
+                            loading = false
+                        }
+                    }
+                }) { Text("DA, nastavi") }
+            },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text("Odustani") } }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 private fun Dashboard(
     base: String,
     connection: ProxmoxConnection,
@@ -258,7 +366,8 @@ private fun Dashboard(
     updateAllBusy: Boolean,
     updateStatuses: Map<String, String>,
     error: String?,
-    clusterStatus: ProxmoxClusterStatus?
+    clusterStatus: ProxmoxClusterStatus?,
+    onClusterManager: () -> Unit
 ) {
     val context = LocalContext.current
     val updater = remember { UpdateManager(context) }
