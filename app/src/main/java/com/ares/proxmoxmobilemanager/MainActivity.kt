@@ -242,7 +242,7 @@ private fun ConnectionScreen(
             ExposedDropdownMenuBox(expanded = profileMenu, onExpandedChange = { profileMenu = !profileMenu }) {
                 OutlinedTextField(profileName, {}, Modifier.fillMaxWidth().menuAnchor(), label = { Text("Profil servera") }, readOnly = true)
                 ExposedDropdownMenu(expanded = profileMenu, onDismissRequest = { profileMenu = false }) {
-                    profiles.forEach { p -> DropdownMenuItem(text = { Text(p.name) }, onClick = { profileName = p.name; profileMenu = false }) }
+                    profiles.forEach { p -> DropdownMenuItem(text = { Text(p.name) }, onClick = { profileName = p.name; local = p.connection.localUrl.removePrefix("https://").removePrefix("http://").substringBefore(":8006"); username = p.connection.username; password = p.connection.password; remote = p.connection.remoteUrl; tokenId = p.connection.tokenId; secret = p.connection.tokenSecret; profileMenu = false }) }
                     DropdownMenuItem(text = { Text("+ Novi server") }, onClick = { profileName = "Proxmox ${profiles.size + 1}"; profileMenu = false })
                 }
             }
