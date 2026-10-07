@@ -47,12 +47,17 @@ fun ProxmoxApp() {
             var updateStatuses by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
             val context = LocalContext.current
             val prefs = remember { context.getSharedPreferences("proxmox_connection", Context.MODE_PRIVATE) }
+            var profiles by remember { mutableStateOf(ProxmoxServerProfiles.load(context)) }
+            var selectedProfile by remember { mutableStateOf(profiles.firstOrNull()?.name ?: "Proxmox") }
             var connection by remember { mutableStateOf(ProxmoxConnection(prefs.getString("localUrl", "") ?: "", prefs.getString("remoteUrl", "") ?: "", prefs.getString("username", "") ?: "", prefs.getString("password", "") ?: "", prefs.getString("tokenId", "") ?: "", prefs.getString("tokenSecret", "") ?: "")) }
             val scope = rememberCoroutineScope()
 
             if (consoleVm != null && connectedBase != null) { ConsoleScreen(connectedBase!!, connection, consoleVm!!, { console.close(); consoleVm=null }) } else if (showSettings || connectedBase == null) {
-                ConnectionScreen(connection, loading, error) { newConnection ->
+                ConnectionScreen(connection, loading, error, profiles, selectedProfile) { profileName, newConnection ->
+                    selectedProfile = profileName
                     connection = newConnection
+                    ProxmoxServerProfiles.save(context, ProxmoxServerProfile(profileName, newConnection))
+                    profiles = ProxmoxServerProfiles.load(context)
                     prefs.edit().putString("localUrl", newConnection.localUrl).putString("remoteUrl", newConnection.remoteUrl).putString("username", newConnection.username).putString("password", newConnection.password).putString("tokenId", newConnection.tokenId).putString("tokenSecret", newConnection.tokenSecret).apply()
                     loading = true
                     error = null
@@ -185,8 +190,12 @@ private fun ConnectionScreen(
     initial: ProxmoxConnection,
     loading: Boolean,
     error: String?,
-    onConnect: (ProxmoxConnection) -> Unit
+    profiles: List<ProxmoxServerProfile>,
+    selectedProfile: String,
+    onConnect: (String, ProxmoxConnection) -> Unit
 ) {
+    var profileName by remember { mutableStateOf(selectedProfile) }
+    var profileMenu by remember { mutableStateOf(false) }
     var local by remember { mutableStateOf(initial.localUrl.removePrefix("https://").removePrefix("http://").substringBefore(":8006")) }
     var localPort by remember { mutableStateOf("8006") }
     var username by remember { mutableStateOf(initial.username) }
@@ -207,7 +216,7 @@ private fun ConnectionScreen(
                     enabled = !loading && (local.isNotBlank() || remote.isNotBlank()),
                     onClick = {
                         val endpoint = if (local.isBlank()) "" else "https://" + local.trim().removePrefix("https://").removePrefix("http://").trimEnd('/') + ":" + localPort.ifBlank { "8006" }
-                        onConnect(ProxmoxConnection(endpoint, remote.trim().trimEnd('/'), username.trim(), password, tokenId.trim(), secret.trim()))
+                        onConnect(profileName.ifBlank { "Proxmox" }, ProxmoxConnection(endpoint, remote.trim().trimEnd('/'), username.trim(), password, tokenId.trim(), secret.trim()))
                     }
                 ) {
                     if (loading) CircularProgressIndicator(modifier = Modifier.height(20.dp))
@@ -229,6 +238,16 @@ private fun ConnectionScreen(
             verticalArrangement = Arrangement.Top
         ) {
             Text("Poveži Proxmox", style = MaterialTheme.typography.headlineMedium)
+            Spacer(Modifier.height(12.dp))
+            ExposedDropdownMenuBox(expanded = profileMenu, onExpandedChange = { profileMenu = !profileMenu }) {
+                OutlinedTextField(profileName, {}, Modifier.fillMaxWidth().menuAnchor(), label = { Text("Profil servera") }, readOnly = true)
+                ExposedDropdownMenu(expanded = profileMenu, onDismissRequest = { profileMenu = false }) {
+                    profiles.forEach { p -> DropdownMenuItem(text = { Text(p.name) }, onClick = { profileName = p.name; profileMenu = false }) }
+                    DropdownMenuItem(text = { Text("+ Novi server") }, onClick = { profileName = "Proxmox ${profiles.size + 1}"; profileMenu = false })
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Text("Spremi više Proxmox servera i brzo se prebacuj između njih.", style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.height(8.dp))
             Text("Na lokalnoj mreži koristi IP, korisničko ime i lozinku. Za udaljeni pristup domenom koristi se API token.")
             Spacer(Modifier.height(20.dp))
