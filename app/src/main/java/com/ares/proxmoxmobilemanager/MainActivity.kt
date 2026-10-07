@@ -38,6 +38,7 @@ fun ProxmoxApp() {
             var nodes by remember { mutableStateOf<List<ProxmoxNode>>(emptyList()) }
             var vms by remember { mutableStateOf<List<ProxmoxVm>>(emptyList()) }
             var storage by remember { mutableStateOf<List<ProxmoxStorage>>(emptyList()) }
+            var clusterStatus by remember { mutableStateOf<ProxmoxClusterStatus?>(null) }
             var vmLoading by remember { mutableStateOf(false) }
             var loading by remember { mutableStateOf(false) }
             var error by remember { mutableStateOf<String?>(null) }
@@ -64,6 +65,7 @@ fun ProxmoxApp() {
                             // Prije su se učitavali tek nakon ručnog osvježavanja.
                             vms = api.getVms(base, newConnection)
                             storage = api.getStorage(base, newConnection)
+                            clusterStatus = api.getClusterStatus(base, newConnection)
                             showSettings = false
                         } catch (e: Exception) {
                             error = e.message ?: "Greška pri povezivanju."
@@ -94,6 +96,7 @@ fun ProxmoxApp() {
                                 }
                                 vms = api.getVms(connectedBase!!, connection)
                                 storage = api.getStorage(connectedBase!!, connection)
+                                clusterStatus = api.getClusterStatus(connectedBase!!, connection)
                                 error = null
                             } catch (e: Exception) {
                                 error = e.message ?: "Radnja nije uspjela."
@@ -152,7 +155,8 @@ fun ProxmoxApp() {
                     },
                     updateAllBusy = updatingAll,
                     updateStatuses = updateStatuses,
-                    error = error
+                    error = error,
+                    clusterStatus = clusterStatus
                 )
             }
         }
@@ -253,7 +257,8 @@ private fun Dashboard(
     onUpdateAll: () -> Unit,
     updateAllBusy: Boolean,
     updateStatuses: Map<String, String>,
-    error: String?
+    error: String?,
+    clusterStatus: ProxmoxClusterStatus?
 ) {
     val context = LocalContext.current
     val updater = remember { UpdateManager(context) }
@@ -376,6 +381,30 @@ private fun Dashboard(
                 }
             }
 
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Hub, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Proxmox Cluster", style = MaterialTheme.typography.titleLarge)
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        if (clusterStatus?.clustered == true) {
+                            Text("Cluster: ${clusterStatus.name}")
+                            Text("Quorum: ${if (clusterStatus.quorate) "OK" else "NEMA QUORUMA"}")
+                            if (clusterStatus.version.isNotBlank()) Text("Verzija: ${clusterStatus.version}")
+                            Text("Nodeovi: ${clusterStatus.nodes.size}")
+                            clusterStatus.nodes.forEach { (name, online) ->
+                                Text("$name • ${if (online == "1") "online" else "offline"}", style = MaterialTheme.typography.bodySmall)
+                            }
+                        } else {
+                            Text("Ovaj Proxmox trenutno nije član clustera.")
+                            Text("U sljedećem koraku dodajemo kreiranje i siguran join clustera.", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
             item { Text("Virtualne mašine i LXC", style = MaterialTheme.typography.headlineSmall) }
             if (vmLoading && vms.isEmpty()) {
                 item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() } }
