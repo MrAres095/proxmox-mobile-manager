@@ -75,6 +75,7 @@ fun ProxmoxApp() {
             } else {
                 Dashboard(
                     base = connectedBase!!,
+                    connection = connection,
                     nodes = nodes,
                     vms = vms,
                     storage = storage,
@@ -238,6 +239,7 @@ private fun ConnectionScreen(
 @Composable
 private fun Dashboard(
     base: String,
+    connection: ProxmoxConnection,
     nodes: List<ProxmoxNode>,
     vms: List<ProxmoxVm>,
     storage: List<ProxmoxStorage>,
