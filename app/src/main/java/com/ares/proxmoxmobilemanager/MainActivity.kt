@@ -119,6 +119,17 @@ fun ProxmoxApp() {
                     },
                     onSettings = { showSettings = true },
                     onConsole = { consoleVm = it },
+                    onEditConfig = { editVm = it },
+                    onSnapshots = { vm ->
+                        snapshotsVm = vm
+                        snapshots = emptyList()
+                        snapshotsLoading = true
+                        scope.launch {
+                            try { snapshots = api.getSnapshots(base, connection, vm) }
+                            catch (e: Exception) { actionMessage = e.message ?: "Snapshoti se ne mogu učitati." }
+                            finally { snapshotsLoading = false }
+                        }
+                    },
                     onSnapshot = { vm, snapName, description ->
                         vmLoading = true
                         scope.launch {
@@ -250,6 +261,8 @@ private fun Dashboard(
     onSettings: () -> Unit,
     onConsole: (ProxmoxVm) -> Unit,
     onSnapshot: (ProxmoxVm, String, String) -> Unit,
+    onEditConfig: (ProxmoxVm) -> Unit,
+    onSnapshots: (ProxmoxVm) -> Unit,
     onUpdateAll: () -> Unit,
     updateAllBusy: Boolean,
     updateStatuses: Map<String, String>,
@@ -266,6 +279,11 @@ private fun Dashboard(
     var detailsConfig by remember { mutableStateOf<ProxmoxVmConfig?>(null) }
     var detailsLoading by remember { mutableStateOf(false) }
     var detailsError by remember { mutableStateOf<String?>(null) }
+    var editVm by remember { mutableStateOf<ProxmoxVm?>(null) }
+    var snapshotsVm by remember { mutableStateOf<ProxmoxVm?>(null) }
+    var snapshots by remember { mutableStateOf<List<Pair<String,String>>>(emptyList()) }
+    var snapshotsLoading by remember { mutableStateOf(false) }
+    var actionMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         updateChecking = true
@@ -376,7 +394,7 @@ private fun Dashboard(
                 item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() } }
             }
             items(vms, key = { it.node + "-" + it.type + "-" + it.vmid }) { vm ->
-                VmCard(vm, vmLoading, onVmAction, onConsole, onSnapshot, onDetails = { selected ->
+                VmCard(vm, vmLoading, onVmAction, onConsole, onSnapshot, onEditConfig, onSnapshots, onDetails = { selected ->
                     detailsVm = selected
                     detailsConfig = null
                     detailsError = null
@@ -426,7 +444,80 @@ private fun Dashboard(
             }
         }
 
-        if (detailsVm != null) {
+    
+    if (editVm != null) {
+        val vm = editVm!!
+        var config by remember(vm.vmid, vm.node) { mutableStateOf<Map<String,String>>(emptyMap()) }
+        var saving by remember { mutableStateOf(false) }
+        LaunchedEffect(vm.vmid, vm.node) {
+            try { config = api.getVmConfig(base, connection, vm).entries.toMap() }
+            catch (e: Exception) { actionMessage = e.message ?: "Konfiguraciju nije moguće učitati." }
+        }
+        AlertDialog(
+            onDismissRequest = { if (!saving) editVm = null },
+            title = { Text("${vm.name} • Uredi konfiguraciju") },
+            text = {
+                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
+                    val editable = listOf("name","cores","sockets","memory","balloon","onboot","boot","cpuunits","ostype","net0")
+                    items(editable) { key ->
+                        var value by remember(config[key]) { mutableStateOf(config[key].orEmpty()) }
+                        OutlinedTextField(value, { value = it; config = config + (key to it) },
+                            modifier=Modifier.fillMaxWidth().padding(vertical=3.dp),
+                            label={Text(key)}, singleLine=true)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(enabled=!saving, onClick={
+                    saving=true
+                    scope.launch {
+                        try {
+                            val editable=listOf("name","cores","sockets","memory","balloon","onboot","boot","cpuunits","ostype","net0")
+                            for(key in editable) if(config.containsKey(key)) api.updateVmConfig(base,connection,vm,key,config[key].orEmpty())
+                            vms=api.getVms(base,connection)
+                            actionMessage="Konfiguracija spremljena."
+                            editVm=null
+                        } catch(e:Exception) { actionMessage=e.message ?: "Spremanje nije uspjelo." }
+                        finally { saving=false }
+                    }
+                }) { Text(if(saving) "Spremanje..." else "Spremi") }
+            },
+            dismissButton={ TextButton(enabled=!saving,onClick={editVm=null}){Text("Odustani")} }
+        )
+    }
+
+    if (snapshotsVm != null) {
+        val vm=snapshotsVm!!
+        AlertDialog(
+            onDismissRequest={snapshotsVm=null},
+            title={Text("${vm.name} • Snapshoti")},
+            text={
+                if(snapshotsLoading) Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.Center){CircularProgressIndicator()}
+                else if(snapshots.isEmpty()) Text("Nema snapshot-a.")
+                else LazyColumn(Modifier.fillMaxWidth().heightIn(max=420.dp)){
+                    items(snapshots,key={it.first}){ snap ->
+                        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
+                            Column(Modifier.weight(1f)){Text(snap.first); if(snap.second.isNotBlank())Text(snap.second,style=MaterialTheme.typography.bodySmall)}
+                            TextButton(onClick={
+                                scope.launch { try { api.rollbackSnapshot(base,connection,vm,snap.first); snapshots=api.getSnapshots(base,connection); actionMessage="Snapshot vraćen." } catch(e:Exception){actionMessage=e.message ?: "Rollback nije uspio."} }
+                            }){Text("Vrati")}
+                            TextButton(onClick={
+                                scope.launch { try { api.deleteSnapshot(base,connection,vm,snap.first); snapshots=api.getSnapshots(base,connection); actionMessage="Snapshot obrisan." } catch(e:Exception){actionMessage=e.message ?: "Brisanje nije uspjelo."} }
+                            }){Text("Obriši")}
+                        }
+                        Divider()
+                    }
+                }
+            },
+            confirmButton={TextButton(onClick={snapshotsVm=null}){Text("Zatvori")}}
+        )
+    }
+
+    if (actionMessage != null) {
+        AlertDialog(onDismissRequest={actionMessage=null},title={Text("Proxmox")},text={Text(actionMessage!!)},confirmButton={TextButton(onClick={actionMessage=null}){Text("OK")}})
+    }
+
+    if (detailsVm != null) {
             val vm = detailsVm!!
             AlertDialog(
                 onDismissRequest = { if (!detailsLoading) detailsVm = null },
@@ -467,6 +558,8 @@ private fun VmCard(
     onAction: (ProxmoxVm, VmAction) -> Unit,
     onConsole: (ProxmoxVm) -> Unit,
     onSnapshot: (ProxmoxVm, String, String) -> Unit,
+    onEditConfig: (ProxmoxVm) -> Unit,
+    onSnapshots: (ProxmoxVm) -> Unit,
     onDetails: (ProxmoxVm) -> Unit
 ) {
     var confirmAction by remember { mutableStateOf<VmAction?>(null) }
@@ -490,6 +583,11 @@ private fun VmCard(
             OutlinedButton({ onConsole(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()){ Icon(Icons.Default.Terminal,null); Spacer(Modifier.width(4.dp)); Text("Console") }
             Spacer(Modifier.height(8.dp))
             OutlinedButton({ onDetails(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.Tune, null); Spacer(Modifier.width(4.dp)); Text("Detalji / konfiguracija") }
+            Spacer(Modifier.height(6.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                OutlinedButton({ onEditConfig(vm) }, enabled=!busy, modifier=Modifier.weight(1f)) { Text("Uredi") }
+                OutlinedButton({ onSnapshots(vm) }, enabled=!busy, modifier=Modifier.weight(1f)) { Text("Snapshoti") }
+            }
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
                 { showSnapshot = true; snapshotName = ""; snapshotDescription = "" },
