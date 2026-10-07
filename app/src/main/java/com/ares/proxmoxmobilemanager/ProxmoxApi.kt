@@ -252,13 +252,22 @@ class ProxmoxApi {
             result
         }
 
+    suspend fun createSnapshot(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, snapName: String, description: String = "") {
+        withContext(Dispatchers.IO) {
+            val endpoint = if (vm.isQemu) "qemu" else "lxc"
+            val params = "snapname=" + URLEncoder.encode(snapName, "UTF-8") +
+                if (description.isBlank()) "" else "&description=" + URLEncoder.encode(description, "UTF-8")
+            post(base, "/api2/json/nodes/${vm.node}/$endpoint/${vm.vmid}/snapshot", connection, 10000, params)
+        }
+    }
+
     private suspend fun postAction(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, action: String) =
         withContext(Dispatchers.IO) {
             val endpoint = if (vm.isQemu) "qemu" else "lxc"
             post(base, "/api2/json/nodes/${vm.node}/$endpoint/${vm.vmid}/status/$action", connection, 10000)
         }
 
-    private suspend fun post(base: String, path: String, connection: ProxmoxConnection, timeout: Int): JSONObject {
+    private suspend fun post(base: String, path: String, connection: ProxmoxConnection, timeout: Int, formBody: String = ""): JSONObject {
         ensureLocalLogin(base, connection)
         return withContext(Dispatchers.IO) {
         val url = URL(base.trimEnd('/') + path)
@@ -272,6 +281,7 @@ class ProxmoxApi {
             setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
         }
         try {
+            if (formBody.isNotBlank()) conn.outputStream.use { it.write(formBody.toByteArray(Charsets.UTF_8)) }
             val code = conn.responseCode
             val stream = if (code in 200..299) conn.inputStream else conn.errorStream
             val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
