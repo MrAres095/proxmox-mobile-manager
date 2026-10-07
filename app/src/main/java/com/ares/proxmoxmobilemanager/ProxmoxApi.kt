@@ -236,7 +236,7 @@ class ProxmoxApi {
                 val value = data.opt(key)
                 key to when (value) {
                     null -> ""
-                    is org.json.JSONObject.NULL -> ""
+                    value == org.json.JSONObject.NULL -> ""
                     else -> value.toString()
                 }
             })
