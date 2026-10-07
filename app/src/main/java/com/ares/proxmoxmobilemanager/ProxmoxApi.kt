@@ -2,6 +2,7 @@ package com.ares.proxmoxmobilemanager
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -43,6 +44,10 @@ data class ProxmoxStorage(
     val total: Long,
     val used: Long,
     val avail: Long
+)
+
+data class ProxmoxVmConfig(
+    val entries: List<Pair<String, String>>
 )
 
 data class ProxmoxVm(
@@ -221,6 +226,22 @@ class ProxmoxApi {
             }.sortedWith(compareBy({ it.node }, { it.vmid }))
         }
 
+    suspend fun getVmConfig(base: String, connection: ProxmoxConnection, vm: ProxmoxVm): ProxmoxVmConfig =
+        withContext(Dispatchers.IO) {
+            val endpoint = if (vm.isQemu) "qemu" else "lxc"
+            val json = request(base, "/api2/json/nodes/${URLEncoder.encode(vm.node, "UTF-8")}/${endpoint}/${vm.vmid}/config", connection, 7000)
+            val data = json.optJSONObject("data") ?: return@withContext ProxmoxVmConfig(emptyList())
+            val keys = data.keys().asSequence().toList().sorted()
+            ProxmoxVmConfig(keys.map { key ->
+                val value = data.opt(key)
+                key to when (value) {
+                    null -> ""
+                    is org.json.JSONObject.NULL -> ""
+                    else -> value.toString()
+                }
+            })
+        }
+
     suspend fun startVm(base: String, connection: ProxmoxConnection, vm: ProxmoxVm) {
         postAction(base, connection, vm, "start")
     }
@@ -296,7 +317,7 @@ class ProxmoxApi {
                     return@withContext
                 }
 
-                Thread.sleep(1000)
+                delay(1000)
             }
             throw IllegalStateException("Proxmox zadatak traje predugo (više od 90 sekundi).")
         }
