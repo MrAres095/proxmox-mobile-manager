@@ -278,6 +278,64 @@ class ProxmoxApi {
         }
     }
 
+
+    suspend fun updateVmConfig(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, key: String, value: String) {
+        withContext(Dispatchers.IO) {
+            val endpoint = if (vm.isQemu) "qemu" else "lxc"
+            val form = URLEncoder.encode(key, "UTF-8") + "=" + URLEncoder.encode(value, "UTF-8")
+            requestWrite(base, "/api2/json/nodes/${URLEncoder.encode(vm.node, "UTF-8")}/$endpoint/${vm.vmid}/config", connection, "PUT", 10000, form)
+        }
+    }
+
+    suspend fun getSnapshots(base: String, connection: ProxmoxConnection, vm: ProxmoxVm): List<Pair<String,String>> =
+        withContext(Dispatchers.IO) {
+            val endpoint = if (vm.isQemu) "qemu" else "lxc"
+            val json = request(base, "/api2/json/nodes/${URLEncoder.encode(vm.node, "UTF-8")}/$endpoint/${vm.vmid}/snapshot", connection, 7000)
+            val data = json.optJSONArray("data") ?: return@withContext emptyList()
+            buildList {
+                for (i in 0 until data.length()) {
+                    val item=data.getJSONObject(i)
+                    add(item.optString("name") to item.optString("description"))
+                }
+            }
+        }
+
+    suspend fun deleteSnapshot(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, name: String) {
+        withContext(Dispatchers.IO) {
+            val endpoint = if (vm.isQemu) "qemu" else "lxc"
+            val path="/api2/json/nodes/${URLEncoder.encode(vm.node, "UTF-8")}/$endpoint/${vm.vmid}/snapshot/${URLEncoder.encode(name, "UTF-8")}"
+            runTaskAndWait(base, connection, vm.node, requestWrite(base,path,connection,"DELETE",10000))
+        }
+    }
+
+    suspend fun rollbackSnapshot(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, name: String) {
+        withContext(Dispatchers.IO) {
+            val endpoint = if (vm.isQemu) "qemu" else "lxc"
+            val path="/api2/json/nodes/${URLEncoder.encode(vm.node, "UTF-8")}/$endpoint/${vm.vmid}/snapshot/${URLEncoder.encode(name, "UTF-8")}/rollback"
+            runTaskAndWait(base, connection, vm.node, requestWrite(base,path,connection,"POST",10000))
+        }
+    }
+
+    suspend fun cloneVm(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, newId: Int, newName: String, full: Boolean) {
+        withContext(Dispatchers.IO) {
+            if (!vm.isQemu) throw IllegalStateException("Clone je trenutno omogućen za QEMU VM.")
+            val form="newid=$newId&name="+URLEncoder.encode(newName,"UTF-8")+"&full="+if(full)"1" else "0"
+            runTaskAndWait(base, connection, vm.node, post(base,"/api2/json/nodes/${vm.node}/qemu/${vm.vmid}/clone",connection,10000,form))
+        }
+    }
+
+    suspend fun migrateVm(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, target: String, online: Boolean) {
+        withContext(Dispatchers.IO) {
+            val endpoint=if(vm.isQemu)"qemu" else "lxc"
+            val form="target="+URLEncoder.encode(target,"UTF-8")+"&online="+if(online)"1" else "0"
+            runTaskAndWait(base,connection,target,post(base,"/api2/json/nodes/${vm.node}/$endpoint/${vm.vmid}/status/migrate",connection,10000,form))
+        }
+    }
+
+    suspend fun backupVm(base: String, connection: ProxmoxVm, vmStorage: String?) {
+        // placeholder intentionally not used
+    }
+
     private suspend fun postAction(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, action: String) =
         withContext(Dispatchers.IO) {
             val endpoint = if (vm.isQemu) "qemu" else "lxc"
@@ -342,6 +400,28 @@ class ProxmoxApi {
         } finally {
             conn.disconnect()
         }
+        }
+    }
+
+
+    private suspend fun requestWrite(base: String, path: String, connection: ProxmoxConnection, method: String, timeout: Int, formBody: String = ""): JSONObject {
+        ensureLocalLogin(base, connection)
+        return withContext(Dispatchers.IO) {
+            val url=URL(base.trimEnd('/')+path)
+            val conn=openConnection(url,base,connection).apply {
+                connectTimeout=timeout; readTimeout=timeout; requestMethod=method; doOutput=method=="POST" || method=="PUT"
+                applyAuth(this,base,connection)
+                setRequestProperty("Accept","application/json")
+                if (doOutput) setRequestProperty("Content-Type","application/x-www-form-urlencoded")
+            }
+            try {
+                if(formBody.isNotBlank()) conn.outputStream.use{it.write(formBody.toByteArray(Charsets.UTF_8))}
+                val code=conn.responseCode
+                val stream=if(code in 200..299)conn.inputStream else conn.errorStream
+                val body=stream?.bufferedReader()?.use{it.readText()}.orEmpty()
+                if(code !in 200..299) throw IllegalStateException("Proxmox HTTP $code: $body")
+                JSONObject(body)
+            } finally { conn.disconnect() }
         }
     }
 
