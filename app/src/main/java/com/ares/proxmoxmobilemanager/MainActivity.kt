@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 
 private val api = ProxmoxApi()
 private val console = ProxmoxConsole()
@@ -168,6 +170,17 @@ fun ProxmoxApp() {
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
+private fun loadServerProfiles(context: Context): List<JSONObject> = runCatching {
+    val raw = context.getSharedPreferences("proxmox_connection", Context.MODE_PRIVATE).getString("serverProfiles", "[]") ?: "[]"
+    val arr = JSONArray(raw)
+    List(arr.length()) { arr.getJSONObject(it) }
+}.getOrDefault(emptyList())
+
+private fun saveServerProfiles(context: Context, profiles: List<JSONObject>) {
+    val arr = JSONArray(); profiles.forEach { arr.put(it) }
+    context.getSharedPreferences("proxmox_connection", Context.MODE_PRIVATE).edit().putString("serverProfiles", arr.toString()).apply()
+}
+
 @Composable
 private fun ConnectionScreen(
     initial: ProxmoxConnection,
@@ -186,7 +199,28 @@ private fun ConnectionScreen(
     var remote by remember { mutableStateOf(initial.remoteUrl) }
     var tokenId by remember { mutableStateOf(initial.tokenId) }
     var secret by remember { mutableStateOf(initial.tokenSecret) }
+    var serverName by remember { mutableStateOf("") }
+    var savedProfiles by remember { mutableStateOf(loadServerProfiles(context)) }
 
+    if (savedProfiles.isNotEmpty()) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+            Text(if (language == "hr") "Spremljeni serveri" else "Saved servers", style = MaterialTheme.typography.titleMedium)
+            savedProfiles.forEach { profile ->
+                val name = profile.optString("name")
+                val endpoint = profile.optString("local").ifBlank { profile.optString("remote") }
+                OutlinedButton(onClick = {
+                    serverName = name
+                    local = profile.optString("local").removePrefix("https://").removePrefix("http://").substringBefore(":8006")
+                    remote = profile.optString("remote")
+                    username = profile.optString("username")
+                    password = profile.optString("password")
+                    tokenId = profile.optString("tokenId")
+                    secret = profile.optString("secret")
+                }, modifier = Modifier.fillMaxWidth()) { Text("$name • $endpoint") }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
     Scaffold(
         topBar = { TopAppBar(title = { Text("Proxmox Mobile Manager") }) },
         bottomBar = {
@@ -199,6 +233,14 @@ private fun ConnectionScreen(
                     enabled = !loading && (local.isNotBlank() || remote.isNotBlank()),
                     onClick = {
                         val endpoint = if (local.isBlank()) "" else "https://" + local.trim().removePrefix("https://").removePrefix("http://").trimEnd('/') + ":" + localPort.ifBlank { "8006" }
+                        val profile = JSONObject().apply {
+                            put("name", serverName.ifBlank { local.ifBlank { remote }.ifBlank { "Proxmox" } })
+                            put("local", endpoint); put("remote", remote.trim().trimEnd('/')); put("username", username.trim()); put("password", password); put("tokenId", tokenId.trim()); put("secret", secret.trim())
+                        }
+                        val updated = savedProfiles.filterNot { it.optString("name") == profile.optString("name") }.toMutableList()
+                        updated.add(profile)
+                        savedProfiles = updated
+                        saveServerProfiles(context, updated)
                         onConnect(ProxmoxConnection(endpoint, remote.trim().trimEnd('/'), username.trim(), password, tokenId.trim(), secret.trim()))
                     }
                 ) {
@@ -220,6 +262,8 @@ private fun ConnectionScreen(
                 .verticalScroll(androidx.compose.foundation.rememberScrollState()),
             verticalArrangement = Arrangement.Top
         ) {
+            OutlinedTextField(serverName, { serverName = it }, Modifier.fillMaxWidth(), label = { Text(if (language == "hr") "Naziv servera" else "Server name") }, placeholder = { Text("npr. PVE kuća") }, singleLine = true)
+            Spacer(Modifier.height(10.dp))
             Text("Poveži Proxmox", style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(8.dp))
             Text("Na lokalnoj mreži koristi IP, korisničko ime i lozinku. Za udaljeni pristup domenom koristi se API token.")
