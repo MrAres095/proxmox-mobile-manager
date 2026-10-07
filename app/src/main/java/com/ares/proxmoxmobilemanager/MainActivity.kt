@@ -118,6 +118,20 @@ fun ProxmoxApp() {
                     },
                     onSettings = { showSettings = true },
                     onConsole = { consoleVm = it },
+                    onSnapshot = { vm, snapName, description ->
+                        vmLoading = true
+                        scope.launch {
+                            try {
+                                api.createSnapshot(connectedBase!!, connection, vm, snapName, description)
+                                vms = api.getVms(connectedBase!!, connection)
+                                error = null
+                            } catch (e: Exception) {
+                                error = e.message ?: "Snapshot nije uspio."
+                            } finally {
+                                vmLoading = false
+                            }
+                        }
+                    },
                     onUpdateAll = {
                         if (!updatingAll) {
                             updatingAll = true
@@ -233,6 +247,7 @@ private fun Dashboard(
     onRefresh: () -> Unit,
     onSettings: () -> Unit,
     onConsole: (ProxmoxVm) -> Unit,
+    onSnapshot: (ProxmoxVm, String, String) -> Unit,
     onUpdateAll: () -> Unit,
     updateAllBusy: Boolean,
     updateStatuses: Map<String, String>,
@@ -355,7 +370,7 @@ private fun Dashboard(
                 item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() } }
             }
             items(vms, key = { it.node + "-" + it.type + "-" + it.vmid }) { vm ->
-                VmCard(vm, vmLoading, onVmAction, onConsole)
+                VmCard(vm, vmLoading, onVmAction, onConsole, onSnapshot)
             }
             if (!vmLoading && vms.isEmpty()) item { Text("Nema pronađenih VM/LXC resursa.") }
 
@@ -395,8 +410,17 @@ private fun Dashboard(
 
 
 @Composable
-private fun VmCard(vm: ProxmoxVm, busy: Boolean, onAction: (ProxmoxVm, VmAction) -> Unit, onConsole: (ProxmoxVm) -> Unit) {
+private fun VmCard(
+    vm: ProxmoxVm,
+    busy: Boolean,
+    onAction: (ProxmoxVm, VmAction) -> Unit,
+    onConsole: (ProxmoxVm) -> Unit,
+    onSnapshot: (ProxmoxVm, String, String) -> Unit
+) {
     var confirmAction by remember { mutableStateOf<VmAction?>(null) }
+    var showSnapshot by remember { mutableStateOf(false) }
+    var snapshotName by remember { mutableStateOf("") }
+    var snapshotDescription by remember { mutableStateOf("") }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -412,6 +436,16 @@ private fun VmCard(vm: ProxmoxVm, busy: Boolean, onAction: (ProxmoxVm, VmAction)
             if (vm.maxDisk > 0) Text("Disk: " + formatBytes(vm.maxDisk))
             Spacer(Modifier.height(12.dp))
             OutlinedButton({ onConsole(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()){ Icon(Icons.Default.Terminal,null); Spacer(Modifier.width(4.dp)); Text("Console") }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                { showSnapshot = true; snapshotName = ""; snapshotDescription = "" },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.CameraAlt, null)
+                Spacer(Modifier.width(4.dp))
+                Text("Napravi snapshot")
+            }
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (vm.isRunning) {
@@ -445,6 +479,46 @@ private fun VmCard(vm: ProxmoxVm, busy: Boolean, onAction: (ProxmoxVm, VmAction)
             }
         }
     }
+    if (showSnapshot) {
+        AlertDialog(
+            onDismissRequest = { if (!busy) showSnapshot = false },
+            title = { Text("Snapshot ${vm.name}") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = snapshotName,
+                        onValueChange = { snapshotName = it.replace(" ", "-").take(80) },
+                        label = { Text("Naziv snapshot-a") },
+                        placeholder = { Text("npr. prije-updatea") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = snapshotDescription,
+                        onValueChange = { snapshotDescription = it.take(200) },
+                        label = { Text("Opis (nije obavezno)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = snapshotName.isNotBlank() && !busy,
+                    onClick = {
+                        val name = snapshotName.trim()
+                        val description = snapshotDescription.trim()
+                        showSnapshot = false
+                        onSnapshot(vm, name, description)
+                    }
+                ) { Text("Kreiraj") }
+            },
+            dismissButton = {
+                TextButton(enabled = !busy, onClick = { showSnapshot = false }) { Text("Odustani") }
+            }
+        )
+    }
+
     confirmAction?.let { action ->
         val stop = action == VmAction.STOP
         val shutdown = action == VmAction.SHUTDOWN
