@@ -17,8 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import org.json.JSONArray
-import org.json.JSONObject
 
 private val api = ProxmoxApi()
 private val console = ProxmoxConsole()
@@ -32,12 +30,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun ProxmoxApp() {
-    val context = LocalContext.current
-    val uiPrefs = remember { context.getSharedPreferences("ui_settings", Context.MODE_PRIVATE) }
-    var themeMode by remember { mutableStateOf(uiPrefs.getString("theme", "system") ?: "system") }
-    var language by remember { mutableStateOf(uiPrefs.getString("language", "hr") ?: "hr") }
-    val dark = when (themeMode) { "dark" -> true; "light" -> false; else -> androidx.compose.foundation.isSystemInDarkTheme() }
-    MaterialTheme(colorScheme = if (dark) darkColorScheme() else lightColorScheme()) {
+    MaterialTheme(colorScheme = darkColorScheme()) {
         Surface(modifier = Modifier.fillMaxSize()) {
             var showSettings by remember { mutableStateOf(true) }
             var consoleVm by remember { mutableStateOf<ProxmoxVm?>(null) }
@@ -51,12 +44,13 @@ fun ProxmoxApp() {
             var error by remember { mutableStateOf<String?>(null) }
             var updatingAll by remember { mutableStateOf(false) }
             var updateStatuses by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+            val context = LocalContext.current
             val prefs = remember { context.getSharedPreferences("proxmox_connection", Context.MODE_PRIVATE) }
             var connection by remember { mutableStateOf(ProxmoxConnection(prefs.getString("localUrl", "") ?: "", prefs.getString("remoteUrl", "") ?: "", prefs.getString("username", "") ?: "", prefs.getString("password", "") ?: "", prefs.getString("tokenId", "") ?: "", prefs.getString("tokenSecret", "") ?: "")) }
             val scope = rememberCoroutineScope()
 
             if (consoleVm != null && connectedBase != null) { ConsoleScreen(connectedBase!!, connection, consoleVm!!, { console.close(); consoleVm=null }) } else if (showSettings || connectedBase == null) {
-                ConnectionScreen(connection, loading, error, language, themeMode, { lang -> language = lang; uiPrefs.edit().putString("language", lang).apply() }, { mode -> themeMode = mode; uiPrefs.edit().putString("theme", mode).apply() }) { newConnection ->
+                ConnectionScreen(connection, loading, error) { newConnection ->
                     connection = newConnection
                     prefs.edit().putString("localUrl", newConnection.localUrl).putString("remoteUrl", newConnection.remoteUrl).putString("username", newConnection.username).putString("password", newConnection.password).putString("tokenId", newConnection.tokenId).putString("tokenSecret", newConnection.tokenSecret).apply()
                     loading = true
@@ -170,26 +164,11 @@ fun ProxmoxApp() {
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-private fun loadServerProfiles(context: Context): List<JSONObject> = runCatching {
-    val raw = context.getSharedPreferences("proxmox_connection", Context.MODE_PRIVATE).getString("serverProfiles", "[]") ?: "[]"
-    val arr = JSONArray(raw)
-    List(arr.length()) { arr.getJSONObject(it) }
-}.getOrDefault(emptyList())
-
-private fun saveServerProfiles(context: Context, profiles: List<JSONObject>) {
-    val arr = JSONArray(); profiles.forEach { arr.put(it) }
-    context.getSharedPreferences("proxmox_connection", Context.MODE_PRIVATE).edit().putString("serverProfiles", arr.toString()).apply()
-}
-
 @Composable
 private fun ConnectionScreen(
     initial: ProxmoxConnection,
     loading: Boolean,
     error: String?,
-    language: String,
-    themeMode: String,
-    onLanguageChange: (String) -> Unit,
-    onThemeChange: (String) -> Unit,
     onConnect: (ProxmoxConnection) -> Unit
 ) {
     var local by remember { mutableStateOf(initial.localUrl.removePrefix("https://").removePrefix("http://").substringBefore(":8006")) }
@@ -199,29 +178,7 @@ private fun ConnectionScreen(
     var remote by remember { mutableStateOf(initial.remoteUrl) }
     var tokenId by remember { mutableStateOf(initial.tokenId) }
     var secret by remember { mutableStateOf(initial.tokenSecret) }
-    val context = LocalContext.current
-    var serverName by remember { mutableStateOf("") }
-    var savedProfiles by remember { mutableStateOf(loadServerProfiles(context)) }
 
-    if (savedProfiles.isNotEmpty()) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-            Text(if (language == "hr") "Spremljeni serveri" else "Saved servers", style = MaterialTheme.typography.titleMedium)
-            savedProfiles.forEach { profile ->
-                val name = profile.optString("name")
-                val endpoint = profile.optString("local").ifBlank { profile.optString("remote") }
-                OutlinedButton(onClick = {
-                    serverName = name
-                    local = profile.optString("local").removePrefix("https://").removePrefix("http://").substringBefore(":8006")
-                    remote = profile.optString("remote")
-                    username = profile.optString("username")
-                    password = profile.optString("password")
-                    tokenId = profile.optString("tokenId")
-                    secret = profile.optString("secret")
-                }, modifier = Modifier.fillMaxWidth()) { Text("$name • $endpoint") }
-            }
-            Spacer(Modifier.height(8.dp))
-        }
-    }
     Scaffold(
         topBar = { TopAppBar(title = { Text("Proxmox Mobile Manager") }) },
         bottomBar = {
@@ -234,14 +191,6 @@ private fun ConnectionScreen(
                     enabled = !loading && (local.isNotBlank() || remote.isNotBlank()),
                     onClick = {
                         val endpoint = if (local.isBlank()) "" else "https://" + local.trim().removePrefix("https://").removePrefix("http://").trimEnd('/') + ":" + localPort.ifBlank { "8006" }
-                        val profile = JSONObject().apply {
-                            put("name", serverName.ifBlank { local.ifBlank { remote }.ifBlank { "Proxmox" } })
-                            put("local", endpoint); put("remote", remote.trim().trimEnd('/')); put("username", username.trim()); put("password", password); put("tokenId", tokenId.trim()); put("secret", secret.trim())
-                        }
-                        val updated = savedProfiles.filterNot { it.optString("name") == profile.optString("name") }.toMutableList()
-                        updated.add(profile)
-                        savedProfiles = updated
-                        saveServerProfiles(context, updated)
                         onConnect(ProxmoxConnection(endpoint, remote.trim().trimEnd('/'), username.trim(), password, tokenId.trim(), secret.trim()))
                     }
                 ) {
@@ -263,8 +212,6 @@ private fun ConnectionScreen(
                 .verticalScroll(androidx.compose.foundation.rememberScrollState()),
             verticalArrangement = Arrangement.Top
         ) {
-            OutlinedTextField(serverName, { serverName = it }, Modifier.fillMaxWidth(), label = { Text(if (language == "hr") "Naziv servera" else "Server name") }, placeholder = { Text("npr. PVE kuća") }, singleLine = true)
-            Spacer(Modifier.height(10.dp))
             Text("Poveži Proxmox", style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(8.dp))
             Text("Na lokalnoj mreži koristi IP, korisničko ime i lozinku. Za udaljeni pristup domenom koristi se API token.")
@@ -288,57 +235,9 @@ private fun ConnectionScreen(
             OutlinedTextField(secret, { secret = it }, Modifier.fillMaxWidth(), label = { Text("API token secret") }, singleLine = true, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
             Spacer(Modifier.height(18.dp))
             if (error != null) { Text(error, color = MaterialTheme.colorScheme.error); Spacer(Modifier.height(12.dp)) }
-            Spacer(Modifier.height(18.dp))
-            Text(if (language == "hr") "Izgled i jezik" else "Appearance & language", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { onLanguageChange("hr") }, enabled = language != "hr") { Text("Hrvatski") }
-                Button(onClick = { onLanguageChange("en") }, enabled = language != "en") { Text("English") }
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { onThemeChange("light") }, enabled = themeMode != "light") { Text(if (language == "hr") "Svijetla" else "Light") }
-                Button(onClick = { onThemeChange("dark") }, enabled = themeMode != "dark") { Text(if (language == "hr") "Tamna" else "Dark") }
-                OutlinedButton(onClick = { onThemeChange("system") }, enabled = themeMode != "system") { Text(if (language == "hr") "Sustav" else "System") }
-            }
 
-        }
-    }if (showClusterCreate) {
-        ClusterCreateDialog(clusterBusy, { if (!clusterBusy) showClusterCreate = false }) { name, link0 ->
-            clusterBusy = true
-            scope.launch {
-                try { api.createCluster(base, connection, name, link0); clusterStatus = api.getClusterStatus(base, connection); showClusterCreate = false; actionMessage = "Cluster kreiran." }
-                catch (e: Exception) { actionMessage = e.message ?: "Kreiranje clustera nije uspjelo." }
-                finally { clusterBusy = false }
-            }
         }
     }
-    if (showClusterJoin) {
-        ClusterJoinDialog(clusterBusy, { if (!clusterBusy) showClusterJoin = false }) { hostname, password, fingerprint, link0, force ->
-            clusterBusy = true
-            scope.launch {
-                try { api.joinCluster(base, connection, hostname, password, fingerprint, link0, force); showClusterJoin = false; actionMessage = "Join je pokrenut; node se može privremeno odspojiti." }
-                catch (e: Exception) { actionMessage = e.message ?: "Join nije uspio." }
-                finally { clusterBusy = false }
-            }
-        }
-    }
-
-}
-
-
-
-
-}
-
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,onBack:()->Unit){
- val scope=rememberCoroutineScope(); var output by remember{mutableStateOf("Spajanje na Proxmox konzolu...\n")}; var input by remember{mutableStateOf("")}; var connected by remember{mutableStateOf(false)}; var error by remember{mutableStateOf<String?>(null)}
- DisposableEffect(vm){ scope.launch{try{console.open(base,connection,vm,{b->val t=String(b,Charsets.UTF_8);if(t=="OK")connected=true else output=(output+t).takeLast(30000)},{reason->connected=false;output+="\n[Veza zatvorena"+(reason?.let{": "+it}?: "")+"]\n"},{e->connected=false;error=e.message?:"Greška konzole"})}catch(e:Exception){error=e.message?:"Spajanje na konzolu nije uspjelo."}};onDispose{console.close()} }
- Scaffold(topBar={TopAppBar(title={Text(vm.name+" • Console")},navigationIcon={IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,"Natrag")}},actions={Text(if(connected)"● LIVE" else "○ povezivanje",Modifier.padding(end=12.dp))})}){p->Column(Modifier.fillMaxSize().padding(p).padding(8.dp)){Surface(Modifier.fillMaxWidth().weight(1f)){Text(output,Modifier.fillMaxSize().padding(8.dp),style=MaterialTheme.typography.bodySmall)};if(error!=null)Text(error!!,color=MaterialTheme.colorScheme.error);Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){OutlinedTextField(input,{input=it},Modifier.weight(1f),label={Text("Unos")},singleLine=true,enabled=connected);Spacer(Modifier.width(6.dp));Button({console.send(input+"\n");input=""},enabled=connected&&input.isNotEmpty()){Text("Pošalji")}};Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){TextButton({console.send("\u0003")},enabled=connected){Text("Ctrl+C")};TextButton({console.send("\u0004")},enabled=connected){Text("Ctrl+D")};TextButton({console.send("\t")},enabled=connected){Text("Tab")};TextButton({console.send("\u001b[A")},enabled=connected){Text("↑")};TextButton({console.send("\u001b[B")},enabled=connected){Text("↓")}}}}}
-
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -377,9 +276,6 @@ private fun Dashboard(
     var snapshots by remember { mutableStateOf<List<Pair<String,String>>>(emptyList()) }
     var snapshotsLoading by remember { mutableStateOf(false) }
     var actionMessage by remember { mutableStateOf<String?>(null) }
-    var showClusterCreate by remember { mutableStateOf(false) }
-    var showClusterJoin by remember { mutableStateOf(false) }
-    var clusterBusy by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         updateChecking = true
@@ -678,31 +574,9 @@ private fun Dashboard(
             )
         }
     }
-    
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ClusterCreateDialog(busy: Boolean, onDismiss: () -> Unit, onCreate: (String,String)->Unit) {
- var name by remember { mutableStateOf("") }; var link0 by remember { mutableStateOf("") }
- AlertDialog(onDismissRequest=onDismiss,title={Text("Kreiraj Proxmox cluster")},text={Column{
-  Text("Naziv clustera se kasnije ne može promijeniti."); Spacer(Modifier.height(8.dp))
-  OutlinedTextField(name,{name=it},Modifier.fillMaxWidth(),label={Text("Naziv")},singleLine=true)
-  Spacer(Modifier.height(8.dp)); OutlinedTextField(link0,{link0=it},Modifier.fillMaxWidth(),label={Text("Link 0 / cluster IP (opcionalno)")},singleLine=true)
- }},confirmButton={Button(enabled=!busy&&name.isNotBlank(),onClick={onCreate(name,link0)}){Text(if(busy)"Kreiranje..." else "Kreiraj")}},dismissButton={TextButton(enabled=!busy,onClick=onDismiss){Text("Odustani")}})
 }
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ClusterJoinDialog(busy:Boolean,onDismiss:()->Unit,onJoin:(String,String,String,String,Boolean)->Unit) {
- var host by remember{mutableStateOf("")}; var pass by remember{mutableStateOf("")}; var fp by remember{mutableStateOf("")}; var link0 by remember{mutableStateOf("")}; var ok by remember{mutableStateOf(false)}; var force by remember{mutableStateOf(false)}
- AlertDialog(onDismissRequest=onDismiss,title={Text("Join node u cluster")},text={Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())){
-  Text("PAŽNJA: join prepisuje postojeću /etc/pve konfiguraciju. Node ne smije imati postojeće VM/LXC goste."); Spacer(Modifier.height(8.dp))
-  OutlinedTextField(host,{host=it},Modifier.fillMaxWidth(),label={Text("IP/hostname cluster nodea")},singleLine=true)
-  Spacer(Modifier.height(8.dp)); OutlinedTextField(pass,{pass=it},Modifier.fillMaxWidth(),label={Text("Cluster root lozinka")},singleLine=true,visualTransformation=androidx.compose.ui.text.input.PasswordVisualTransformation())
-  Spacer(Modifier.height(8.dp)); OutlinedTextField(fp,{fp=it},Modifier.fillMaxWidth(),label={Text("TLS fingerprint")},singleLine=true)
-  Spacer(Modifier.height(8.dp)); OutlinedTextField(link0,{link0=it},Modifier.fillMaxWidth(),label={Text("Link 0 (opcionalno)")},singleLine=true)
-  Row(verticalAlignment=Alignment.CenterVertically){Checkbox(force,{force=it});Text("Force")}
-  Row(verticalAlignment=Alignment.CenterVertically){Checkbox(ok,{ok=it});Text("Potvrđujem da node nema VM/LXC i prihvaćam promjenu konfiguracije.")}
- }},confirmButton={Button(enabled=!busy&&ok&&host.isNotBlank()&&pass.isNotBlank()&&fp.isNotBlank(),onClick={onJoin(host,pass,fp,link0,force)}){Text(if(busy)"Join..." else "Pokreni join")}},dismissButton={TextButton(enabled=!busy,onClick=onDismiss){Text("Odustani")}})
-}
+
+
 @Composable
 private fun VmCard(
     vm: ProxmoxVm,
@@ -842,8 +716,6 @@ private fun VmCard(
     }
 }
 
-}
-
 private enum class VmAction { START, STOP, REBOOT, SHUTDOWN, RESET }
 
 private fun formatBytes(value: Long): String {
@@ -853,4 +725,12 @@ private fun formatBytes(value: Long): String {
     var i = 0
     while (v >= 1024 && i < units.lastIndex) { v /= 1024; i++ }
     return "${"%.1f".format(v)} ${units[i]}"
+}
 
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,onBack:()->Unit){
+ val scope=rememberCoroutineScope(); var output by remember{mutableStateOf("Spajanje na Proxmox konzolu...\n")}; var input by remember{mutableStateOf("")}; var connected by remember{mutableStateOf(false)}; var error by remember{mutableStateOf<String?>(null)}
+ DisposableEffect(vm){ scope.launch{try{console.open(base,connection,vm,{b->val t=String(b,Charsets.UTF_8);if(t=="OK")connected=true else output=(output+t).takeLast(30000)},{reason->connected=false;output+="\n[Veza zatvorena"+(reason?.let{": "+it}?: "")+"]\n"},{e->connected=false;error=e.message?:"Greška konzole"})}catch(e:Exception){error=e.message?:"Spajanje na konzolu nije uspjelo."}};onDispose{console.close()} }
+ Scaffold(topBar={TopAppBar(title={Text(vm.name+" • Console")},navigationIcon={IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,"Natrag")}},actions={Text(if(connected)"● LIVE" else "○ povezivanje",Modifier.padding(end=12.dp))})}){p->Column(Modifier.fillMaxSize().padding(p).padding(8.dp)){Surface(Modifier.fillMaxWidth().weight(1f)){Text(output,Modifier.fillMaxSize().padding(8.dp),style=MaterialTheme.typography.bodySmall)};if(error!=null)Text(error!!,color=MaterialTheme.colorScheme.error);Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){OutlinedTextField(input,{input=it},Modifier.weight(1f),label={Text("Unos")},singleLine=true,enabled=connected);Spacer(Modifier.width(6.dp));Button({console.send(input+"\n");input=""},enabled=connected&&input.isNotEmpty()){Text("Pošalji")}};Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){TextButton({console.send("\u0003")},enabled=connected){Text("Ctrl+C")};TextButton({console.send("\u0004")},enabled=connected){Text("Ctrl+D")};TextButton({console.send("\t")},enabled=connected){Text("Tab")};TextButton({console.send("\u001b[A")},enabled=connected){Text("↑")};TextButton({console.send("\u001b[B")},enabled=connected){Text("↓")}}}}}
