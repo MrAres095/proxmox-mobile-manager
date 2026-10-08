@@ -906,116 +906,54 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
  val lifecycleOwner=androidx.lifecycle.compose.LocalLifecycleOwner.current
  val clipboard=androidx.compose.ui.platform.LocalClipboardManager.current
  val context=androidx.compose.ui.platform.LocalContext.current
- val consolePrefs=remember{context.getSharedPreferences("console_state", Context.MODE_PRIVATE)}
- val stateKey=remember(base,vm.node,vm.vmid){"console_"+base.hashCode()+"_"+vm.node+"_"+vm.vmid}
- var output by remember(stateKey){mutableStateOf(consolePrefs.getString(stateKey,"Spajanje na Proxmox konzolu...\\n")?:"Spajanje na Proxmox konzolu...\\n")}
- val latestOutput by rememberUpdatedState(output)
+ val prefs=remember{context.getSharedPreferences("console_state",Context.MODE_PRIVATE)}
+ val key=remember(base,vm.node,vm.vmid){"console_"+base.hashCode()+"_"+vm.node+"_"+vm.vmid}
+ var output by remember(key){mutableStateOf(prefs.getString(key,"")?:"")}
+ val latest by rememberUpdatedState(output)
+ val list=androidx.compose.foundation.lazy.rememberLazyListState()
  var input by remember{mutableStateOf("")}
- var connected by remember{mutableStateOf(false)}
+ var live by remember{mutableStateOf(false)}
  var connecting by remember{mutableStateOf(false)}
  var error by remember{mutableStateOf<String?>(null)}
-
+ fun clean(v:String)=v.replace(Regex("\u001B\\[[0-9;?]*[ -/]*[@-~]"),"").replace("\r","")
  fun connect(){
-  if(connecting) return
-  connecting=true
-  error=null
+  if(connecting)return
+  connecting=true;error=null
   scope.launch{
-   try{
-    console.open(base,connection,vm,{b->
-     val t=String(b,Charsets.UTF_8)
-     if(t=="OK") connected=true else output=(output+t).takeLast(50000)
-    },{reason->
-     connected=false
-     if(reason!=null) output=(output+"\n[Veza zatvorena: "+reason+"]\n").takeLast(50000)
-    },{e->
-     connected=false
-     error=e.message?:"Greška konzole"
-    })
-   }catch(e:Exception){
-    connected=false
-    error=e.message?:"Spajanje na konzolu nije uspjelo."
-   }finally{
-    connecting=false
-   }
+   try{console.open(base,connection,vm,{b->{val t=clean(String(b,Charsets.UTF_8));if(t=="OK")live=true else output=(output+t).takeLast(80000)}},{reason->{live=false;if(reason!=null)output=(output+"\n[Veza zatvorena: "+reason+"]\n").takeLast(80000)}},{e->{live=false;error=e.message?:"Greška konzole"}})}
+   catch(e:Exception){live=false;error=e.message?:"Spajanje nije uspjelo."}
+   finally{connecting=false}
   }
  }
-
- LaunchedEffect(vm){ connect() }
-
+ LaunchedEffect(vm){connect()}
+ LaunchedEffect(output){if(output.isNotBlank())list.scrollToItem(0)}
  androidx.compose.runtime.DisposableEffect(lifecycleOwner,vm){
-  val observer=androidx.lifecycle.LifecycleEventObserver{_,event->
-   when(event){
-    androidx.lifecycle.Lifecycle.Event.ON_RESUME -> if(!connected) connect()
-    androidx.lifecycle.Lifecycle.Event.ON_STOP -> consolePrefs.edit().putString(stateKey,latestOutput.takeLast(30000)).apply()
-    else -> Unit
-   }
-  }
+  val observer=androidx.lifecycle.LifecycleEventObserver{_,event->when(event){
+   androidx.lifecycle.Lifecycle.Event.ON_RESUME->if(!live)connect()
+   androidx.lifecycle.Lifecycle.Event.ON_STOP->prefs.edit().putString(key,latest.takeLast(50000)).apply()
+   else->Unit}}
   lifecycleOwner.lifecycle.addObserver(observer)
-  onDispose{
-   lifecycleOwner.lifecycle.removeObserver(observer)
-   consolePrefs.edit().putString(stateKey,latestOutput.takeLast(30000)).apply()
-   console.close()
-  }
+  onDispose{lifecycleOwner.lifecycle.removeObserver(observer);prefs.edit().putString(key,latest.takeLast(50000)).apply();console.close()}
  }
-
- LaunchedEffect(vm, connected){
-  if (connected) {
-   while (true) {
-    delay(15000)
-    if (connected) console.ping()
-   }
-  }
- }
-
- LaunchedEffect(vm){
-  var retryDelay = 1000L
-  while (true) {
-   delay(retryDelay)
-   if (!connected && !connecting) {
-    connect()
-    retryDelay = (retryDelay * 2).coerceAtMost(15000L)
-   } else if (connected) {
-    retryDelay = 1000L
-   }
-  }
- }
-
+ LaunchedEffect(vm,live){if(live)while(true){delay(15000);if(live)console.ping()}}
+ LaunchedEffect(vm){var retry=1000L;while(true){delay(retry);if(!live&&!connecting){connect();retry=(retry*2).coerceAtMost(15000L)}else if(live)retry=1000L}}
  Scaffold(
-  topBar={TopAppBar(
-   title={Text(vm.name+" • Console")},
-   navigationIcon={IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,"Natrag")}},
-   actions={
-    TextButton(
-     enabled=output.isNotBlank(),
-     onClick={clipboard.setText(androidx.compose.ui.text.AnnotatedString(output))}
-    ){Text("Kopiraj")}
-    Text(if(connected)"● LIVE" else if(connecting)"○ spajanje" else "○ offline",Modifier.padding(end=8.dp))
-   }
-  )}
+  containerColor=androidx.compose.ui.graphics.Color(0xFF080A0C),
+  topBar={TopAppBar(colors=TopAppBarDefaults.topAppBarColors(containerColor=androidx.compose.ui.graphics.Color(0xFF111417),titleContentColor=androidx.compose.ui.graphics.Color.White),title={Column{Text(vm.name);Text(vm.type.uppercase()+" • "+vm.node+" • VMID "+vm.vmid,style=MaterialTheme.typography.labelSmall)}},navigationIcon={IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,"Natrag",tint=androidx.compose.ui.graphics.Color.White)}},actions={IconButton(onClick={connect()},enabled=!connecting){Icon(Icons.Default.Refresh,"Reconnect",tint=androidx.compose.ui.graphics.Color.White)};IconButton(onClick={clipboard.setText(androidx.compose.ui.text.AnnotatedString(output))}){Icon(Icons.Default.ContentCopy,"Kopiraj",tint=androidx.compose.ui.graphics.Color.White)};Text(if(live)"● LIVE" else if(connecting)"○..." else "○ OFF",modifier=Modifier.padding(end=8.dp))}})},
  ){p->
-  Column(Modifier.fillMaxSize().padding(p).padding(8.dp)){
-   Surface(Modifier.fillMaxWidth().weight(1f)){
-    SelectionContainer{
-     Text(output,Modifier.fillMaxSize().padding(8.dp),style=MaterialTheme.typography.bodySmall)
-    }
-   }
-   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
-    OutlinedButton({clipboard.setText(androidx.compose.ui.text.AnnotatedString(output))},enabled=output.isNotBlank(),modifier=Modifier.weight(1f)){Text("Kopiraj sve")}
-    OutlinedButton({output="";error=null},modifier=Modifier.weight(1f)){Text("Očisti")}
-   }
+  Column(Modifier.fillMaxSize().padding(p).padding(6.dp)){
+   androidx.compose.foundation.lazy.LazyColumn(state=list,reverseLayout=true,modifier=Modifier.fillMaxWidth().weight(1f).background(androidx.compose.ui.graphics.Color(0xFF050607)).padding(10.dp)){item{SelectionContainer{Text(clean(output),color=androidx.compose.ui.graphics.Color(0xFFE6E6E6),fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace,fontSize=12.sp)}}}
    if(error!=null)Text(error!!,color=MaterialTheme.colorScheme.error)
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+    OutlinedButton(onClick={clipboard.setText(androidx.compose.ui.text.AnnotatedString(output))},enabled=output.isNotBlank(),modifier=Modifier.weight(1f)){Text("Kopiraj")}
+    OutlinedButton(onClick={output="";error=null},modifier=Modifier.weight(1f)){Text("Očisti")}
+    OutlinedButton(onClick={console.send("\u0003")},enabled=live,modifier=Modifier.weight(1f)){Text("Ctrl+C")}
+   }
    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
-    OutlinedTextField(input,{input=it},Modifier.weight(1f),label={Text("Unos")},singleLine=true,enabled=connected)
-    Spacer(Modifier.width(6.dp))
-    Button({console.send(input+"\n");input=""},enabled=connected&&input.isNotEmpty()){Text("Pošalji")}
+    OutlinedTextField(input,{input=it},Modifier.weight(1f),label={Text("Terminal input")},singleLine=true,enabled=live,textStyle=MaterialTheme.typography.bodyMedium.copy(fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace))
+    Spacer(Modifier.width(5.dp));Button(onClick={console.send(input+"\n");input=""},enabled=live&&input.isNotEmpty()){Text("ENTER")}
    }
-   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
-    TextButton({console.send("\u0003")},enabled=connected){Text("Ctrl+C")}
-    TextButton({console.send("\u0004")},enabled=connected){Text("Ctrl+D")}
-    TextButton({console.send("\t")},enabled=connected){Text("Tab")}
-    TextButton({console.send("\u001b[A")},enabled=connected){Text("↑")}
-    TextButton({console.send("\u001b[B")},enabled=connected){Text("↓")}
-   }
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly){TextButton(onClick={console.send("\u0004")},enabled=live){Text("Ctrl+D")};TextButton(onClick={console.send("\t")},enabled=live){Text("Tab")};TextButton(onClick={console.send("\u001b[A")},enabled=live){Text("↑")};TextButton(onClick={console.send("\u001b[B")},enabled=live){Text("↓")};TextButton(onClick={console.send("\u001b[D")},enabled=live){Text("←")};TextButton(onClick={console.send("\u001b[C")},enabled=live){Text("→")}}
   }
  }
 }
