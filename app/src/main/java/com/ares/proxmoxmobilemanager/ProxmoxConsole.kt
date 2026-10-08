@@ -17,6 +17,7 @@ import javax.net.ssl.X509TrustManager
 class ProxmoxConsole(
     private val api: ProxmoxApi = ProxmoxApi()
 ) {
+    @Volatile
     private var socket: WebSocket? = null
 
     private val localTrustManager = object : X509TrustManager {
@@ -110,7 +111,8 @@ class ProxmoxConsole(
                 .apply { authHeaders.forEach { (k, v) -> header(k, v) } }
                 .build()
 
-            socket = client.newWebSocket(req, listener(session.third, session.second, onData, onClosed, onError))
+            val ws = client.newWebSocket(req, listener(session.third, session.second, onData, onClosed, onError))
+            socket = ws
         } catch (e: Throwable) {
             client.dispatcher.cancelAll()
             client.connectionPool.evictAll()
@@ -203,10 +205,14 @@ class ProxmoxConsole(
             onData(t.toByteArray(Charsets.UTF_8))
         }
         override fun onFailure(ws: WebSocket, t: Throwable, res: Response?) {
-            onError(t)
+            if (socket === ws) socket = null
+            val detail = res?.let { " (HTTP ${it.code})" }.orEmpty()
+            onError(IllegalStateException((t.message ?: "WebSocket greška") + detail, t))
+            onClosed(t.message)
         }
         override fun onClosed(ws: WebSocket, code: Int, reason: String) {
-            onClosed(reason.ifBlank { null })
+            if (socket === ws) socket = null
+            onClosed(reason.ifBlank { "WebSocket zatvoren (code $code)" })
         }
     }
 
@@ -226,7 +232,8 @@ class ProxmoxConsole(
     }
 
     fun close() {
-        socket?.close(1000, "closed")
+        val ws = socket
         socket = null
+        ws?.close(1000, "closed")
     }
 }
