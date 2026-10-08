@@ -883,7 +883,7 @@ private fun Dashboard(
                     scope.launch {
                         try {
                             api.cloneVm(base, connection, vm, newId, cloneName.trim(), cloneFull)
-                            vms = api.getVms(base, connection)
+                            onRefresh()
                             actionMessage = "VM ${vm.name} je kloniran kao ${cloneName.trim()} (VMID $newId)."
                             cloneVmState = null
                         } catch (e: Exception) { actionMessage = e.message ?: "Kloniranje nije uspjelo." }
