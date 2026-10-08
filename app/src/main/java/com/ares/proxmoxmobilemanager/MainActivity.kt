@@ -612,6 +612,7 @@ private fun Dashboard(
                     }
                 }
             }
+            item { Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { Text("Replication", style = MaterialTheme.typography.titleLarge); Spacer(Modifier.height(6.dp)); Text("Pregled Proxmox replication jobova između nodeova."); Spacer(Modifier.height(10.dp)); Button(onClick = onReplication, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Sync, contentDescription = null); Spacer(Modifier.width(6.dp)); Text("Otvori Replication") } } } }
             item { Text("Virtualne mašine i LXC", style = MaterialTheme.typography.headlineSmall) }
             if (vmLoading && vms.isEmpty()) {
                 item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() } }
@@ -1022,6 +1023,32 @@ private fun Dashboard(
     }
 }
 
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReplicationDialog(jobs: List<ProxmoxReplicationJob>, loading: Boolean, onRefresh: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(onDismissRequest = { if (!loading) onDismiss() }, title = { Text("Replication jobovi") }, text = {
+        Column(Modifier.fillMaxWidth()) {
+            if (loading) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
+            else if (jobs.isEmpty()) Text("Nema pronađenih replication jobova.")
+            else LazyColumn(Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
+                items(jobs, key = { it.id.ifBlank { it.target + it.type } }) { job ->
+                    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) { Column(Modifier.padding(12.dp)) {
+                        Text("Job: ${job.id.ifBlank { "—" }}", style = MaterialTheme.typography.titleMedium)
+                        Text("Target: ${job.target.ifBlank { "—" }}")
+                        Text("Tip: ${job.type.ifBlank { "—" }}")
+                        Text("Raspored: ${job.schedule.ifBlank { "—" }}")
+                        Text("Status: ${job.state.ifBlank { "—" }}")
+                        if (job.lastSync > 0) Text("Zadnja sinkronizacija: ${job.lastSync}")
+                        if (job.duration > 0) Text("Trajanje: ${job.duration}s")
+                        if (job.failCount > 0) Text("Neuspjeli pokušaji: ${job.failCount}")
+                        if (job.error.isNotBlank()) Text("Greška: ${job.error}", color = MaterialTheme.colorScheme.error)
+                    } }
+                }
+            }
+        }
+    }, confirmButton = { TextButton(onClick = onRefresh, enabled = !loading) { Text("Osvježi") } }, dismissButton = { TextButton(onClick = onDismiss, enabled = !loading) { Text("Zatvori") } })
+}
 
 @Composable
 private fun VmCard(
