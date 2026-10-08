@@ -58,6 +58,31 @@ data class ProxmoxClusterStatus(
     val nodes: List<Pair<String, String>>
  )
 
+
+
+data class ProxmoxTask(
+    val upid: String,
+    val type: String,
+    val status: String,
+    val exitStatus: String,
+    val user: String,
+    val startTime: Long,
+    val endTime: Long
+)
+
+data class ProxmoxFirewallRule(
+    val pos: Int,
+    val action: String,
+    val type: String,
+    val iface: String,
+    val source: String,
+    val dest: String,
+    val proto: String,
+    val dport: String,
+    val sport: String,
+    val comment: String,
+    val enable: Boolean
+)
 data class ProxmoxVm(
     val node: String,
     val vmid: Int,
@@ -375,6 +400,30 @@ class ProxmoxApi {
             val endpoint=if(vm.isQemu)"qemu" else "lxc"
             val form="target="+URLEncoder.encode(target,"UTF-8")+"&online="+if(online)"1" else "0"
             runTaskAndWait(base,connection,target,post(base,"/api2/json/nodes/${vm.node}/$endpoint/${vm.vmid}/status/migrate",connection,10000,form))
+        }
+    }
+
+    suspend fun getTasks(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, limit: Int = 100): List<ProxmoxTask> = withContext(Dispatchers.IO) {
+        val endpoint = if (vm.isQemu) "qemu" else "lxc"
+        val json = request(base, "/api2/json/nodes/${URLEncoder.encode(vm.node, "UTF-8")}/$endpoint/${vm.vmid}/tasks?limit=$limit", connection, 7000)
+        val data = json.optJSONArray("data") ?: return@withContext emptyList()
+        buildList {
+            for (i in 0 until data.length()) {
+                val x = data.getJSONObject(i)
+                add(ProxmoxTask(x.optString("upid"), x.optString("type"), x.optString("status"), x.optString("exitstatus"), x.optString("user"), x.optLong("starttime"), x.optLong("endtime")))
+            }
+        }
+    }
+
+    suspend fun getFirewallRules(base: String, connection: ProxmoxConnection, vm: ProxmoxVm): List<ProxmoxFirewallRule> = withContext(Dispatchers.IO) {
+        val endpoint = if (vm.isQemu) "qemu" else "lxc"
+        val json = request(base, "/api2/json/nodes/${URLEncoder.encode(vm.node, "UTF-8")}/$endpoint/${vm.vmid}/firewall/rules", connection, 7000)
+        val data = json.optJSONArray("data") ?: return@withContext emptyList()
+        buildList {
+            for (i in 0 until data.length()) {
+                val x = data.getJSONObject(i)
+                add(ProxmoxFirewallRule(x.optInt("pos"),x.optString("action"),x.optString("type"),x.optString("iface"),x.optString("source"),x.optString("dest"),x.optString("proto"),x.optString("dport"),x.optString("sport"),x.optString("comment"),x.optBoolean("enable", true)))
+            }
         }
     }
 
