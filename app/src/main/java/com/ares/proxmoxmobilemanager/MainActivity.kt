@@ -639,6 +639,10 @@ private fun Dashboard(
                         cloneVmState = null
                         actionMessage = "Clone je trenutno omogućen samo za QEMU VM."
                     }
+                }, onMigrate = { selected ->
+                    migrateVmState = selected
+                    migrateTarget = nodes.firstOrNull { it.node != selected.node }?.node.orEmpty()
+                    migrateOnline = true
                 }, onTasks = { selected ->
                     tasksVm = selected
                     tasks = emptyList()
