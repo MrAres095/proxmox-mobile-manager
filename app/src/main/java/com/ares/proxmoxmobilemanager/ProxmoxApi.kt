@@ -439,6 +439,29 @@ class ProxmoxApi {
         }
     }
 
+    suspend fun addFirewallRule(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, action: String, type: String = "in", enable: Boolean = true, comment: String = "") {
+        withContext(Dispatchers.IO) {
+            val endpoint = if (vm.isQemu) "qemu" else "lxc"
+            val parts = mutableListOf("action=" + URLEncoder.encode(action, "UTF-8"), "type=" + URLEncoder.encode(type, "UTF-8"), "enable=" + if (enable) "1" else "0")
+            if (comment.isNotBlank()) parts += "comment=" + URLEncoder.encode(comment, "UTF-8")
+            requestWrite(base, "/api2/json/nodes/${URLEncoder.encode(vm.node, "UTF-8")}/$endpoint/${vm.vmid}/firewall/rules", connection, "POST", 10000, parts.joinToString("&"))
+        }
+    }
+
+    suspend fun setFirewallRuleEnabled(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, pos: Int, enabled: Boolean) {
+        withContext(Dispatchers.IO) {
+            val endpoint = if (vm.isQemu) "qemu" else "lxc"
+            requestWrite(base, "/api2/json/nodes/${URLEncoder.encode(vm.node, "UTF-8")}/$endpoint/${vm.vmid}/firewall/rules/$pos", connection, "PUT", 10000, "enable=" + if (enabled) "1" else "0")
+        }
+    }
+
+    suspend fun deleteFirewallRule(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, pos: Int) {
+        withContext(Dispatchers.IO) {
+            val endpoint = if (vm.isQemu) "qemu" else "lxc"
+            requestWrite(base, "/api2/json/nodes/${URLEncoder.encode(vm.node, "UTF-8")}/$endpoint/${vm.vmid}/firewall/rules/$pos", connection, "DELETE", 10000)
+        }
+    }
+
     suspend fun backupVm(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, storage: String? = null) {
         withContext(Dispatchers.IO) {
             val endpoint = if (vm.isQemu) "qemu" else "lxc"
