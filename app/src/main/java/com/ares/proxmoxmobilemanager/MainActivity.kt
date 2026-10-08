@@ -448,6 +448,9 @@ private fun Dashboard(
     var snapshotsLoading by remember { mutableStateOf(false) }
     var actionMessage by remember { mutableStateOf<String?>(null) }
     var tasksVm by remember { mutableStateOf<ProxmoxVm?>(null) }
+    var firewallVm by remember { mutableStateOf<ProxmoxVm?>(null) }
+    var firewallRules by remember { mutableStateOf<List<ProxmoxFirewallRule>>(emptyList()) }
+    var firewallLoading by remember { mutableStateOf(false) }
     var tasks by remember { mutableStateOf<List<ProxmoxTask>>(emptyList()) }
     var tasksLoading by remember { mutableStateOf(false) }
 
@@ -595,6 +598,15 @@ private fun Dashboard(
                         catch (e: Exception) { actionMessage = e.message ?: "Snapshoti se ne mogu učitati." }
                         finally { snapshotsLoading = false }
                     }
+                }, onFirewall = { selected ->
+                    firewallVm = selected
+                    firewallRules = emptyList()
+                    firewallLoading = true
+                    scope.launch {
+                        try { firewallRules = api.getFirewallRules(base, connection, selected) }
+                        catch (e: Exception) { actionMessage = e.message ?: "Firewall pravila se ne mogu učitati." }
+                        finally { firewallLoading = false }
+                    }
                 }, onTasks = { selected ->
                     tasksVm = selected
                     tasks = emptyList()
@@ -655,6 +667,32 @@ private fun Dashboard(
         }
 
     
+    if (firewallVm != null) {
+        val vm = firewallVm!!
+        AlertDialog(
+            onDismissRequest = { firewallVm = null },
+            title = { Text("${vm.name} • Firewall") },
+            text = {
+                when {
+                    firewallLoading -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
+                    firewallRules.isEmpty() -> Text("Nema firewall pravila ili ih Proxmox nije vratio.")
+                    else -> LazyColumn(Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
+                        items(firewallRules, key = { it.pos }) { rule ->
+                            Column(Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
+                                Text("${rule.pos}. ${rule.action.uppercase()} • ${rule.type.ifBlank { "rule" }}", style = MaterialTheme.typography.titleSmall)
+                                if (rule.comment.isNotBlank()) Text(rule.comment)
+                                val details = listOf("Interface" to rule.iface, "Source" to rule.source, "Destination" to rule.dest, "Protocol" to rule.proto, "DPort" to rule.dport, "SPort" to rule.sport).filter { it.second.isNotBlank() }
+                                details.forEach { (k,v) -> Text("$k: $v", style = MaterialTheme.typography.bodySmall) }
+                                Text(if (rule.enable) "Enabled" else "Disabled", style = MaterialTheme.typography.bodySmall)
+                            }
+                            Divider()
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { firewallVm = null }) { Text("Zatvori") } }
+        )
+    }
     if (tasksVm != null) {
         val vm = tasksVm!!
         AlertDialog(
@@ -796,6 +834,7 @@ private fun VmCard(
     onEditConfig: (ProxmoxVm) -> Unit,
     onSnapshots: (ProxmoxVm) -> Unit,
     onTasks: (ProxmoxVm) -> Unit,
+    onFirewall: (ProxmoxVm) -> Unit,
     onDetails: (ProxmoxVm) -> Unit
 ) {
     var confirmAction by remember { mutableStateOf<VmAction?>(null) }
@@ -824,6 +863,8 @@ private fun VmCard(
                 OutlinedButton({ onEditConfig(vm) }, enabled=!busy, modifier=Modifier.weight(1f)) { Text("Uredi") }
                 OutlinedButton({ onSnapshots(vm) }, enabled=!busy, modifier=Modifier.weight(1f)) { Text("Snapshoti") }
             }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton({ onFirewall(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.Security, null); Spacer(Modifier.width(4.dp)); Text("Firewall") }
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
                 { showSnapshot = true; snapshotName = ""; snapshotDescription = "" },
