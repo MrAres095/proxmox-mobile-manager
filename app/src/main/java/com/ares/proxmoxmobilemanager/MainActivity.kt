@@ -465,6 +465,10 @@ private fun Dashboard(
     var cloneName by remember { mutableStateOf("") }
     var cloneFull by remember { mutableStateOf(true) }
     var cloneLoading by remember { mutableStateOf(false) }
+    var migrateVmState by remember { mutableStateOf<ProxmoxVm?>(null) }
+    var migrateTarget by remember { mutableStateOf("") }
+    var migrateOnline by remember { mutableStateOf(true) }
+    var migrateLoading by remember { mutableStateOf(false) }
     var tasks by remember { mutableStateOf<List<ProxmoxTask>>(emptyList()) }
     var tasksLoading by remember { mutableStateOf(false) }
     var nodeTasksNode by remember { mutableStateOf<String?>(null) }
@@ -859,6 +863,10 @@ private fun Dashboard(
         )
     }
 
+    if (migrateVmState != null) {
+        val vm = migrateVmState!!
+        AlertDialog(onDismissRequest={if(!migrateLoading)migrateVmState=null},title={Text("${vm.name} • Migracija")},text={Column{Text("Izvor: ${vm.node}");nodes.filter{it.node!=vm.node}.forEach{node->Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){RadioButton(selected=migrateTarget==node.node,onClick={migrateTarget=node.node},enabled=!migrateLoading);Text(node.node)}};Row(verticalAlignment=Alignment.CenterVertically){Checkbox(checked=migrateOnline,onCheckedChange={migrateOnline=it},enabled=!migrateLoading);Text("Online migracija")}}},confirmButton={TextButton(enabled=!migrateLoading&&migrateTarget.isNotBlank(),onClick={migrateLoading=true;scope.launch{try{api.migrateVm(base,connection,vm,migrateTarget,migrateOnline);onRefresh();actionMessage="Migracija završena.";migrateVmState=null}catch(e:Exception){actionMessage=e.message?:"Migracija nije uspjela."}finally{migrateLoading=false}}}){Text(if(migrateLoading)"Migriranje..." else "Migriraj")}},dismissButton={TextButton(enabled=!migrateLoading,onClick={migrateVmState=null}){Text("Odustani")}})}
+
     if (cloneVmState != null) {
         val vm = cloneVmState!!
         AlertDialog(
@@ -946,6 +954,7 @@ private fun VmCard(
     onTasks: (ProxmoxVm) -> Unit,
     onFirewall: (ProxmoxVm) -> Unit,
     onClone: (ProxmoxVm) -> Unit,
+    onMigrate: (ProxmoxVm) -> Unit,
     onDetails: (ProxmoxVm) -> Unit
 ) {
     var confirmAction by remember { mutableStateOf<VmAction?>(null) }
@@ -980,6 +989,8 @@ private fun VmCard(
             OutlinedButton({ onFirewall(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.Security, null); Spacer(Modifier.width(4.dp)); Text("Firewall") }
             Spacer(Modifier.height(8.dp))
             OutlinedButton({ onClone(vm) }, enabled=!busy && vm.isQemu, modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.ContentCopy, null); Spacer(Modifier.width(4.dp)); Text("Kloniraj QEMU VM") }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton({ onMigrate(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.SwapHoriz, null); Spacer(Modifier.width(4.dp)); Text("Migriraj na drugi node") }
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
                 { showSnapshot = true; snapshotName = ""; snapshotDescription = "" },
