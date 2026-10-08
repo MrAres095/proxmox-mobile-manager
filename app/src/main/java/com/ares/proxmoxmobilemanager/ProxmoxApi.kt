@@ -427,8 +427,14 @@ class ProxmoxApi {
         }
     }
 
-    suspend fun backupVm(base: String, connection: ProxmoxVm, vmStorage: String?) {
-        // placeholder intentionally not used
+    suspend fun backupVm(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, storage: String? = null) {
+        withContext(Dispatchers.IO) {
+            val endpoint = if (vm.isQemu) "qemu" else "lxc"
+            val params = storage?.trim()?.takeIf { it.isNotBlank() }?.let {
+                "storage=" + URLEncoder.encode(it, "UTF-8")
+            } ?: ""
+            runTaskAndWait(base, connection, vm.node, post(base, "/api2/json/nodes/" + URLEncoder.encode(vm.node, "UTF-8") + "/" + endpoint + "/" + vm.vmid + "/vzdump", connection, 15000, params))
+        }
     }
 
     private suspend fun postAction(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, action: String) =
