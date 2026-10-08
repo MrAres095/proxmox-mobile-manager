@@ -462,6 +462,9 @@ private fun Dashboard(
     var firewallLoading by remember { mutableStateOf(false) }
     var tasks by remember { mutableStateOf<List<ProxmoxTask>>(emptyList()) }
     var tasksLoading by remember { mutableStateOf(false) }
+    var nodeTasksNode by remember { mutableStateOf<String?>(null) }
+    var nodeTasks by remember { mutableStateOf<List<ProxmoxTask>>(emptyList()) }
+    var nodeTasksLoading by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         updateChecking = true
@@ -659,6 +662,25 @@ private fun Dashboard(
                         Text("CPU: ${"%.1f".format(node.cpu * 100)}% / ${node.maxCpu} CPU")
                         Text("RAM: ${formatBytes(node.mem)} / ${formatBytes(node.maxMem)}")
                         Text("Uptime: ${node.uptime}s")
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                nodeTasksNode = node.node
+                                nodeTasks = emptyList()
+                                nodeTasksLoading = true
+                                scope.launch {
+                                    try { nodeTasks = api.getNodeTasks(base, connection, node.node) }
+                                    catch (e: Exception) { actionMessage = e.message ?: "Povijest zadataka se ne može učitati." }
+                                    finally { nodeTasksLoading = false }
+                                }
+                            },
+                            enabled = !nodeTasksLoading,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.History, null)
+                            Spacer(Modifier.width(4.dp))
+                            Text("Povijest zadataka")
+                        }
                     }
                 }
             }
@@ -677,6 +699,32 @@ private fun Dashboard(
         }
 
     
+    if (nodeTasksNode != null) {
+        val nodeName = nodeTasksNode!!
+        AlertDialog(
+            onDismissRequest = { if (!nodeTasksLoading) nodeTasksNode = null },
+            title = { Text("$" + "{nodeName} • Povijest zadataka") },
+            text = {
+                when {
+                    nodeTasksLoading -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
+                    nodeTasks.isEmpty() -> Text("Nema zadataka za ovaj node.")
+                    else -> LazyColumn(Modifier.fillMaxWidth().heightIn(max = 460.dp)) {
+                        items(nodeTasks, key = { it.upid }) { task ->
+                            Column(Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
+                                Text(task.type.ifBlank { "task" }, style = MaterialTheme.typography.titleSmall)
+                                Text("Status: " + task.status.ifBlank { "—" })
+                                if (task.exitStatus.isNotBlank()) Text("Rezultat: " + task.exitStatus)
+                                if (task.user.isNotBlank()) Text("Korisnik: " + task.user, style = MaterialTheme.typography.bodySmall)
+                            }
+                            Divider()
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { nodeTasksNode = null }, enabled = !nodeTasksLoading) { Text("Zatvori") } }
+        )
+    }
+
     if (firewallVm != null) {
         val vm = firewallVm!!
         AlertDialog(
