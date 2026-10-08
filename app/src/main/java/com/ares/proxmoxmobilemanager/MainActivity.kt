@@ -940,7 +940,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
  Scaffold(
   containerColor=androidx.compose.ui.graphics.Color(0xFF080A0C),
   topBar={TopAppBar(colors=TopAppBarDefaults.topAppBarColors(containerColor=androidx.compose.ui.graphics.Color(0xFF111417),titleContentColor=androidx.compose.ui.graphics.Color.White),title={Column{Text(vm.name);Text(vm.type.uppercase()+" • "+vm.node+" • VMID "+vm.vmid,style=MaterialTheme.typography.labelSmall)}},navigationIcon={IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,"Natrag",tint=androidx.compose.ui.graphics.Color.White)}},actions={IconButton(onClick={connect()},enabled=!connecting){Icon(Icons.Default.Refresh,"Reconnect",tint=androidx.compose.ui.graphics.Color.White)};IconButton(onClick={clipboard.setText(androidx.compose.ui.text.AnnotatedString(output))}){Icon(Icons.Default.ContentCopy,"Kopiraj",tint=androidx.compose.ui.graphics.Color.White)};Text(if(live)"● LIVE" else if(connecting)"○..." else "○ OFF",modifier=Modifier.padding(end=8.dp))}})},
- ){p->
+ ) { p ->
   Column(Modifier.fillMaxSize().padding(p).padding(6.dp)){
    androidx.compose.foundation.lazy.LazyColumn(state=list,reverseLayout=true,modifier=Modifier.fillMaxWidth().weight(1f).background(androidx.compose.ui.graphics.Color(0xFF050607)).padding(10.dp)){item{SelectionContainer{Text(clean(output),color=androidx.compose.ui.graphics.Color(0xFFE6E6E6),fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace,fontSize=12.sp)}}}
    if(error!=null)Text(error!!,color=MaterialTheme.colorScheme.error)
