@@ -439,12 +439,15 @@ class ProxmoxApi {
         }
     }
 
-    suspend fun addFirewallRule(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, action: String, type: String = "in", enable: Boolean = true, comment: String = "") {
+    suspend fun addFirewallRule(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, action: String, type: String = "in", enable: Boolean = true, comment: String = "", iface: String = "", source: String = "", dest: String = "", proto: String = "", dport: String = "", sport: String = "") {
         withContext(Dispatchers.IO) {
             val endpoint = if (vm.isQemu) "qemu" else "lxc"
             val parts = mutableListOf("action=" + URLEncoder.encode(action, "UTF-8"), "type=" + URLEncoder.encode(type, "UTF-8"), "enable=" + if (enable) "1" else "0")
-            if (comment.isNotBlank()) parts += "comment=" + URLEncoder.encode(comment, "UTF-8")
-            requestWrite(base, "/api2/json/nodes/${URLEncoder.encode(vm.node, "UTF-8")}/$endpoint/${vm.vmid}/firewall/rules", connection, "POST", 10000, parts.joinToString("&"))
+            listOf("comment" to comment, "iface" to iface, "source" to source, "dest" to dest, "proto" to proto, "dport" to dport, "sport" to sport).forEach { (key, value) ->
+                if (value.isNotBlank()) parts += key + "=" + URLEncoder.encode(value, "UTF-8")
+            }
+            val path = "/api2/json/nodes/" + URLEncoder.encode(vm.node, "UTF-8") + "/" + endpoint + "/" + vm.vmid + "/firewall/rules"
+            requestWrite(base, path, connection, "POST", 10000, parts.joinToString("&"))
         }
     }
 
