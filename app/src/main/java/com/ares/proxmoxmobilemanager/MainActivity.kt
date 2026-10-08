@@ -958,11 +958,25 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
   }
  }
 
+ LaunchedEffect(vm, connected){
+  if (connected) {
+   while (true) {
+    delay(15000)
+    if (connected) console.ping()
+   }
+  }
+ }
+
  LaunchedEffect(vm){
-  while(true){
-   delay(10000)
-   if(connected) console.ping()
-   else if(!connecting) connect()
+  var retryDelay = 1000L
+  while (true) {
+   delay(retryDelay)
+   if (!connected && !connecting) {
+    connect()
+    retryDelay = (retryDelay * 2).coerceAtMost(15000L)
+   } else if (connected) {
+    retryDelay = 1000L
+   }
   }
  }
 
