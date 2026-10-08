@@ -138,6 +138,16 @@ fun ProxmoxApp() {
                     onSettings = { showSettings = true },
                     onClusterManager = { showClusterManager = true },
                     onConsole = { consoleVm = it },
+                    onFirewall = { selected ->
+                        firewallVm = selected
+                        firewallRules = emptyList()
+                        firewallLoading = true
+                        scope.launch {
+                            try { firewallRules = api.getFirewallRules(connectedBase!!, connection, selected) }
+                            catch (e: Exception) { error = e.message ?: "Firewall pravila se ne mogu učitati." }
+                            finally { firewallLoading = false }
+                        }
+                    },
                     onSnapshot = { vm, snapName, description ->
                         vmLoading = true
                         scope.launch {
@@ -424,6 +434,7 @@ private fun Dashboard(
     onSettings: () -> Unit,
     onConsole: (ProxmoxVm) -> Unit,
     onSnapshot: (ProxmoxVm, String, String) -> Unit,
+    onFirewall: (ProxmoxVm) -> Unit,
     onUpdateAll: () -> Unit,
     updateAllBusy: Boolean,
     updateStatuses: Map<String, String>,
