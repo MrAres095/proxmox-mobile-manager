@@ -120,6 +120,50 @@ class ProxmoxConsole(
         }
     }
 
+
+    suspend fun openNode(
+        base: String,
+        connection: ProxmoxConnection,
+        node: ProxmoxNode,
+        onData: (ByteArray) -> Unit,
+        onClosed: (String?) -> Unit,
+        onError: (Throwable) -> Unit
+    ) {
+        close()
+        val client = clientFor(base, connection)
+        val authHeaders = api.getConsoleAuthHeaders(base, connection)
+        val proxyUrl = base.trimEnd('/') + "/api2/json/nodes/" + node.node + "/termproxy"
+        val session = withContext(Dispatchers.IO) {
+            val req = Request.Builder()
+                .url(proxyUrl)
+                .post(RequestBody.create(null, ByteArray(0)))
+                .header("Accept", "application/json")
+                .header("Referer", nodeConsoleReferer(base, node))
+                .apply { authHeaders.forEach { (k, v) -> header(k, v) } }
+                .build()
+            client.newCall(req).execute().use { res ->
+                val body = res.body?.string().orEmpty()
+                if (!res.isSuccessful) throw IllegalStateException("node termproxy HTTP " + res.code + ": " + body)
+                val data = JSONObject(body).getJSONObject("data")
+                Triple(data.getInt("port"), data.getString("ticket"), authUser(connection, data.optString("user")))
+            }
+        }
+        val wsBase = base.replaceFirst(Regex("^https://"), "wss://")
+            .replaceFirst(Regex("^http://"), "ws://")
+            .trimEnd('/')
+        val wsUrl = wsBase + "/api2/json/nodes/" + node.node +
+            "/vncwebsocket?port=" + session.first + "&vncticket=" + URLEncoder.encode(session.second, "UTF-8")
+        val req = Request.Builder()
+            .url(wsUrl)
+            .header("Sec-WebSocket-Protocol", "binary")
+            .header("Cache-Control", "no-cache")
+            .header("Pragma", "no-cache")
+            .header("Referer", nodeConsoleReferer(base, node))
+            .apply { authHeaders.forEach { (k, v) -> header(k, v) } }
+            .build()
+        socket = client.newWebSocket(req, listener(session.third, session.second, onData, onClosed, onError))
+    }
+
     suspend fun upgradeNode(
         base: String,
         connection: ProxmoxConnection,
