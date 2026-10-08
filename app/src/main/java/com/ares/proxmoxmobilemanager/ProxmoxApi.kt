@@ -257,6 +257,30 @@ class ProxmoxApi {
             request(base, "/api2/json/cluster/config/join", connection, 7000).optJSONObject("data") ?: JSONObject()
         }
 
+    suspend fun getNodeSyslog(base: String, connection: ProxmoxConnection, node: ProxmoxNode): List<String> =
+        withContext(Dispatchers.IO) {
+            val json = request(base, "/api2/json/nodes/${URLEncoder.encode(node.node, "UTF-8")}/syslog?limit=200", connection, 7000)
+            val data = json.optJSONArray("data") ?: return@withContext emptyList()
+            buildList {
+                for (i in 0 until data.length()) {
+                    val item = data.getJSONObject(i)
+                    add(item.optString("t", item.optString("msg", item.toString())))
+                }
+            }
+        }
+
+    suspend fun getNodeAptUpdates(base: String, connection: ProxmoxConnection, node: ProxmoxNode): List<Pair<String,String>> =
+        withContext(Dispatchers.IO) {
+            val json = request(base, "/api2/json/nodes/${URLEncoder.encode(node.node, "UTF-8")}/apt/update", connection, 10000)
+            val data = json.optJSONArray("data") ?: return@withContext emptyList()
+            buildList {
+                for (i in 0 until data.length()) {
+                    val item = data.getJSONObject(i)
+                    add(item.optString("Package") to item.optString("Version"))
+                }
+            }
+        }
+
     suspend fun getNodes(base: String, connection: ProxmoxConnection): List<ProxmoxNode> =
         withContext(Dispatchers.IO) {
             val json = request(base, "/api2/json/nodes", connection, 7000)
