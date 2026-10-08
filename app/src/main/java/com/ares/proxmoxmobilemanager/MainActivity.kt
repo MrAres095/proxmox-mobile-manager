@@ -41,6 +41,9 @@ fun ProxmoxApp() {
         Surface(modifier = Modifier.fillMaxSize()) {
             var showSettings by remember { mutableStateOf(true) }
             var showClusterManager by remember { mutableStateOf(false) }
+            var showReplication by remember { mutableStateOf(false) }
+            var replicationJobs by remember { mutableStateOf<List<ProxmoxReplicationJob>>(emptyList()) }
+            var replicationLoading by remember { mutableStateOf(false) }
             var showUiSettings by remember { mutableStateOf(false) }
             var language by remember { mutableStateOf(uiPrefs.getString("language", "hr") ?: "hr") }
             var consoleVm by remember { mutableStateOf<ProxmoxVm?>(null) }
@@ -137,6 +140,7 @@ fun ProxmoxApp() {
                     },
                     onSettings = { showSettings = true },
                     onClusterManager = { showClusterManager = true },
+                    onReplication = { showReplication = true; replicationLoading = true; scope.launch { try { replicationJobs = api.getReplicationJobs(connectedBase!!, connection) } catch (e: Exception) { error = e.message ?: "Replication se ne može učitati." } finally { replicationLoading = false } } },
                     onConsole = { consoleVm = it },
                     onSnapshot = { vm, snapName, description ->
                         vmLoading = true
@@ -183,6 +187,7 @@ fun ProxmoxApp() {
                     clusterStatus = clusterStatus
                 )
                 if (showUiSettings) { UiSettingsDialog(theme, language, { theme = it; uiPrefs.edit().putString("theme", it).apply() }, { language = it; uiPrefs.edit().putString("language", it).apply() }, { showUiSettings = false }) }
+                if (showReplication) { ReplicationDialog(jobs = replicationJobs, loading = replicationLoading, onRefresh = { replicationLoading = true; scope.launch { try { replicationJobs = api.getReplicationJobs(connectedBase!!, connection) } catch (e: Exception) { error = e.message ?: "Replication se ne može učitati." } finally { replicationLoading = false } } }, onDismiss = { showReplication = false }) }
                 if (showClusterManager) {
                     ClusterManagementDialog(
                         base = connectedBase!!,
@@ -438,7 +443,8 @@ private fun Dashboard(
     updateStatuses: Map<String, String>,
     error: String?,
     clusterStatus: ProxmoxClusterStatus?,
-    onClusterManager: () -> Unit
+    onClusterManager: () -> Unit,
+    onReplication: () -> Unit
 ) {
     val context = LocalContext.current
     val updater = remember { UpdateManager(context) }
