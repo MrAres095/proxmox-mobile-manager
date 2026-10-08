@@ -946,14 +946,14 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
   val observer=androidx.lifecycle.LifecycleEventObserver{_,event->
    when(event){
     androidx.lifecycle.Lifecycle.Event.ON_RESUME -> if(!connected) connect()
-    androidx.lifecycle.Lifecycle.Event.ON_STOP -> consolePrefs.edit().putString(stateKey,latestOutput.value.takeLast(30000)).apply()
+    androidx.lifecycle.Lifecycle.Event.ON_STOP -> consolePrefs.edit().putString(stateKey,latestOutput.takeLast(30000)).apply()
     else -> Unit
    }
   }
   lifecycleOwner.lifecycle.addObserver(observer)
   onDispose{
    lifecycleOwner.lifecycle.removeObserver(observer)
-   consolePrefs.edit().putString(stateKey,latestOutput.value.takeLast(30000)).apply()
+   consolePrefs.edit().putString(stateKey,latestOutput.takeLast(30000)).apply()
    console.close()
   }
  }
