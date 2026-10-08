@@ -469,6 +469,9 @@ private fun Dashboard(
     var migrateTarget by remember { mutableStateOf("") }
     var migrateOnline by remember { mutableStateOf(true) }
     var migrateLoading by remember { mutableStateOf(false) }
+    var backupVmState by remember { mutableStateOf<ProxmoxVm?>(null) }
+    var backupStorage by remember { mutableStateOf("") }
+    var backupLoading by remember { mutableStateOf(false) }
     var tasks by remember { mutableStateOf<List<ProxmoxTask>>(emptyList()) }
     var tasksLoading by remember { mutableStateOf(false) }
     var nodeTasksNode by remember { mutableStateOf<String?>(null) }
@@ -619,7 +622,9 @@ private fun Dashboard(
                         catch (e: Exception) { actionMessage = e.message ?: "Snapshoti se ne mogu učitati." }
                         finally { snapshotsLoading = false }
                     }
-                }, onBackup = { selected -> onBackup(selected)
+                }, onBackup = { selected ->
+                    backupVmState = selected
+                    backupStorage = ""
                 }, onFirewall = { selected ->
                     firewallVm = selected
                     firewallRules = emptyList()
@@ -870,6 +875,53 @@ private fun Dashboard(
     if (migrateVmState != null) {
         val vm = migrateVmState!!
         AlertDialog(onDismissRequest={if(!migrateLoading)migrateVmState=null},title={Text("${vm.name} • Migracija")},text={Column{Text("Izvor: ${vm.node}");nodes.filter{it.node!=vm.node}.forEach{node->Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){RadioButton(selected=migrateTarget==node.node,onClick={migrateTarget=node.node},enabled=!migrateLoading);Text(node.node)}};Row(verticalAlignment=Alignment.CenterVertically){Checkbox(checked=migrateOnline,onCheckedChange={migrateOnline=it},enabled=!migrateLoading);Text("Online migracija")}}},confirmButton={TextButton(enabled=!migrateLoading&&migrateTarget.isNotBlank(),onClick={migrateLoading=true;scope.launch{try{api.migrateVm(base,connection,vm,migrateTarget,migrateOnline);onRefresh();actionMessage="Migracija završena.";migrateVmState=null}catch(e:Exception){actionMessage=e.message?:"Migracija nije uspjela."}finally{migrateLoading=false}}}){Text(if(migrateLoading)"Migriranje..." else "Migriraj")}},dismissButton={TextButton(enabled=!migrateLoading,onClick={migrateVmState=null}){Text("Odustani")}})}
+
+    if (backupVmState != null) {
+        val vm = backupVmState!!
+        val backupStorages = storage.filter { s ->
+            s.node == vm.node && s.active && s.enabled && s.content.split(',').map { it.trim().lowercase() }.contains("backup")
+        }
+        AlertDialog(
+            onDismissRequest = { if (!backupLoading) backupVmState = null },
+            title = { Text("${vm.name} • Backup") },
+            text = {
+                Column {
+                    Text("Odredišni storage", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(6.dp))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = backupStorage.isBlank(), onClick = { backupStorage = "" }, enabled = !backupLoading)
+                        Column { Text("Automatski"); Text("Proxmox bira zadani backup storage.", style = MaterialTheme.typography.bodySmall) }
+                    }
+                    backupStorages.forEach { s ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = backupStorage == s.storage, onClick = { backupStorage = s.storage }, enabled = !backupLoading)
+                            Column { Text(s.storage); Text("${s.type} • slobodno ${formatBytes(s.avail)}", style = MaterialTheme.typography.bodySmall) }
+                        }
+                    }
+                    if (backupStorages.isEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("Nije pronađen posebno označen backup storage na nodeu. Možeš ipak koristiti Automatski.", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = !backupLoading, onClick = {
+                    backupLoading = true
+                    scope.launch {
+                        try {
+                            api.backupVm(base, connection, vm, backupStorage.ifBlank { null })
+                            onRefresh()
+                            actionMessage = if (backupStorage.isBlank()) "Backup ${vm.name} je uspješno završen." else "Backup ${vm.name} je uspješno spremljen na ${backupStorage}."
+                            backupVmState = null
+                        } catch (e: Exception) {
+                            actionMessage = e.message ?: "Backup nije uspio."
+                        } finally { backupLoading = false }
+                    }
+                }) { Text(if (backupLoading) "Backup u tijeku..." else "Pokreni backup") }
+            },
+            dismissButton = { TextButton(enabled = !backupLoading, onClick = { backupVmState = null }) { Text("Odustani") } }
+        )
+    }
 
     if (cloneVmState != null) {
         val vm = cloneVmState!!
