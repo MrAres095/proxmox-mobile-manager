@@ -905,7 +905,11 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
  val scope=rememberCoroutineScope()
  val lifecycleOwner=androidx.lifecycle.compose.LocalLifecycleOwner.current
  val clipboard=androidx.compose.ui.platform.LocalClipboardManager.current
- var output by remember{mutableStateOf("Spajanje na Proxmox konzolu...\n")}
+ val context=androidx.compose.ui.platform.LocalContext.current
+ val consolePrefs=remember{context.getSharedPreferences("console_state", Context.MODE_PRIVATE)}
+ val stateKey=remember(base,vm.node,vm.vmid){"console_"+base.hashCode()+"_"+vm.node+"_"+vm.vmid}
+ var output by remember(stateKey){mutableStateOf(consolePrefs.getString(stateKey,"Spajanje na Proxmox konzolu...\\n")?:"Spajanje na Proxmox konzolu...\\n")}
+ val latestOutput by rememberUpdatedState(output)
  var input by remember{mutableStateOf("")}
  var connected by remember{mutableStateOf(false)}
  var connecting by remember{mutableStateOf(false)}
@@ -940,11 +944,16 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
 
  androidx.compose.runtime.DisposableEffect(lifecycleOwner,vm){
   val observer=androidx.lifecycle.LifecycleEventObserver{_,event->
-   if(event==androidx.lifecycle.Lifecycle.Event.ON_RESUME && !connected) connect()
+   when(event){
+    androidx.lifecycle.Lifecycle.Event.ON_RESUME -> if(!connected) connect()
+    androidx.lifecycle.Lifecycle.Event.ON_STOP -> consolePrefs.edit().putString(stateKey,latestOutput.value.takeLast(30000)).apply()
+    else -> Unit
+   }
   }
   lifecycleOwner.lifecycle.addObserver(observer)
   onDispose{
    lifecycleOwner.lifecycle.removeObserver(observer)
+   consolePrefs.edit().putString(stateKey,latestOutput.value.takeLast(30000)).apply()
    console.close()
   }
  }
