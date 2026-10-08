@@ -43,6 +43,7 @@ fun ProxmoxApp() {
             var showClusterManager by remember { mutableStateOf(false) }
             var showReplication by remember { mutableStateOf(false) }
             var selectedNode by remember { mutableStateOf<ProxmoxNode?>(null) }
+            var shellNode by remember { mutableStateOf<ProxmoxNode?>(null) }
             var replicationJobs by remember { mutableStateOf<List<ProxmoxReplicationJob>>(emptyList()) }
             var replicationLoading by remember { mutableStateOf(false) }
             var showUiSettings by remember { mutableStateOf(false) }
@@ -189,7 +190,8 @@ fun ProxmoxApp() {
                     clusterStatus = clusterStatus
                 )
                 if (showUiSettings) { UiSettingsDialog(theme, language, { theme = it; uiPrefs.edit().putString("theme", it).apply() }, { language = it; uiPrefs.edit().putString("language", it).apply() }, { showUiSettings = false }) }
-                if (selectedNode != null) { NodeManagementDialog(base = connectedBase!!, connection = connection, node = selectedNode!!, onDismiss = { selectedNode = null }) }
+                if (selectedNode != null) { NodeManagementDialog(base = connectedBase!!, connection = connection, node = selectedNode!!, onShell = { shellNode = selectedNode }, onDismiss = { selectedNode = null }) }
+                if (shellNode != null) { NodeShellScreen(base = connectedBase!!, connection = connection, node = shellNode!!, onBack = { shellNode = null }) }
                 if (showReplication) { ReplicationDialog(jobs = replicationJobs, loading = replicationLoading, onRefresh = { replicationLoading = true; scope.launch { try { replicationJobs = api.getReplicationJobs(connectedBase!!, connection) } catch (e: Exception) { error = e.message ?: "Replication se ne može učitati." } finally { replicationLoading = false } } }, onDismiss = { showReplication = false }) }
                 if (showClusterManager) {
                     ClusterManagementDialog(
@@ -1057,12 +1059,114 @@ private fun ReplicationDialog(jobs: List<ProxmoxReplicationJob>, loading: Boolea
 }
 
 @Composable
-private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, node: ProxmoxNode, onDismiss: () -> Unit) {
+private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, node: ProxmoxNode, onShell: () -> Unit, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope(); var tab by remember { mutableStateOf("summary") }; var logs by remember { mutableStateOf<List<String>>(emptyList()) }; var updates by remember { mutableStateOf<List<Pair<String,String>>>(emptyList()) }; var busy by remember { mutableStateOf(false) }; var message by remember { mutableStateOf<String?>(null) }
     fun loadLogs() { busy=true; scope.launch { try { logs=api.getNodeSyslog(base,connection,node); message=null } catch(e:Exception){message=e.message} finally{busy=false} } }
     fun loadUpdates() { busy=true; scope.launch { try { updates=api.getNodeAptUpdates(base,connection,node); message=null } catch(e:Exception){message=e.message} finally{busy=false} } }
     LaunchedEffect(tab) { if(tab=="logs") loadLogs(); if(tab=="updates") loadUpdates() }
-    AlertDialog(onDismissRequest={if(!busy)onDismiss()},title={Text("Server: ${node.node}")},text={Column(Modifier.fillMaxWidth()){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){listOf("summary" to "Summary","logs" to "Syslog","updates" to "Updates").forEach{(id,label)->OutlinedButton(onClick={tab=id},enabled=!busy,modifier=Modifier.weight(1f)){Text(label)}}};Spacer(Modifier.height(8.dp));when(tab){"summary"->Column{Text("Status: ${node.status}");Text("CPU: ${"%.1f".format(node.cpu*100)}% / ${node.maxCpu} CPU");Text("RAM: ${formatBytes(node.mem)} / ${formatBytes(node.maxMem)}");Text("Uptime: ${node.uptime}s");Spacer(Modifier.height(8.dp));Text("Node management");Text("Syslog i Updates su sada dostupni; Shell, Disks, Firewall i System slijede kao zasebni moduli.")};"logs"->if(busy)CircularProgressIndicator() else LazyColumn(Modifier.heightIn(max=350.dp)){items(logs){Text(it,style=MaterialTheme.typography.bodySmall);Divider()}};else->if(busy)CircularProgressIndicator() else LazyColumn(Modifier.heightIn(max=350.dp)){items(updates){Text("${it.first}  ${it.second}")}}};if(message!=null)Text(message!!,color=MaterialTheme.colorScheme.error)}},confirmButton={TextButton(onClick=onDismiss,enabled=!busy){Text("Zatvori")}},dismissButton={TextButton(onClick={if(tab=="logs")loadLogs() else if(tab=="updates")loadUpdates()},enabled=!busy&&tab!="summary"){Text("Osvježi")}})
+    AlertDialog(onDismissRequest={if(!busy)onDismiss()},title={Text("Server: ${node.node}")},text={Column(Modifier.fillMaxWidth()){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){listOf("summary" to "Summary","logs" to "Syslog","updates" to "Updates").forEach{(id,label)->OutlinedButton(onClick={tab=id},enabled=!busy,modifier=Modifier.weight(1f)){Text(label)}}};Spacer(Modifier.height(8.dp));when(tab){"summary"->Column{Text("Status: ${node.status}");Text("CPU: ${"%.1f".format(node.cpu*100)}% / ${node.maxCpu} CPU");Text("RAM: ${formatBytes(node.mem)} / ${formatBytes(node.maxMem)}");Text("Uptime: ${node.uptime}s");Spacer(Modifier.height(8.dp));Text("Node management");Spacer(Modifier.height(8.dp));Button(onClick=onShell,enabled=!busy,modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Terminal,null);Spacer(Modifier.width(4.dp));Text("Otvori Shell")};Spacer(Modifier.height(8.dp));Text("Syslog i Updates su sada dostupni; Disks, Firewall i System slijede kao zasebni moduli.")};"logs"->if(busy)CircularProgressIndicator() else LazyColumn(Modifier.heightIn(max=350.dp)){items(logs){Text(it,style=MaterialTheme.typography.bodySmall);Divider()}};else->if(busy)CircularProgressIndicator() else LazyColumn(Modifier.heightIn(max=350.dp)){items(updates){Text("${it.first}  ${it.second}")}}};if(message!=null)Text(message!!,color=MaterialTheme.colorScheme.error)}},confirmButton={TextButton(onClick=onDismiss,enabled=!busy){Text("Zatvori")}},dismissButton={TextButton(onClick={if(tab=="logs")loadLogs() else if(tab=="updates")loadUpdates()},enabled=!busy&&tab!="summary"){Text("Osvježi")}})
+}
+
+
+@Composable
+private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: ProxmoxNode, onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val stateKey = remember(base, node.node) { "node_shell_" + base.hashCode() + "_" + node.node }
+    var output by remember(stateKey) { mutableStateOf("Spajanje na " + node.node + "...\n") }
+    val latestOutput by rememberUpdatedState(output)
+    var input by remember { mutableStateOf("") }
+    var connected by remember { mutableStateOf(false) }
+    var connecting by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    fun connect() {
+        if (connecting) return
+        connecting = true
+        error = null
+        scope.launch {
+            try {
+                console.openNode(base, connection, node, { b ->
+                    val t = String(b, Charsets.UTF_8)
+                    if (t == "OK") connected = true else output = (output + t).takeLast(50000)
+                }, { reason ->
+                    connected = false
+                    if (reason != null) output = (output + "\n[Veza zatvorena: " + reason + "]\n").takeLast(50000)
+                }, { e ->
+                    connected = false
+                    error = e.message ?: "Greška node shell-a"
+                })
+            } catch (e: Exception) {
+                connected = false
+                error = e.message ?: "Spajanje na node shell nije uspjelo."
+            } finally {
+                connecting = false
+            }
+        }
+    }
+
+    LaunchedEffect(node) { connect() }
+
+    DisposableEffect(lifecycleOwner, node) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> if (!connected) connect()
+                androidx.lifecycle.Lifecycle.Event.ON_STOP -> context.getSharedPreferences("console_state", Context.MODE_PRIVATE).edit().putString(stateKey, latestOutput.takeLast(30000)).apply()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            context.getSharedPreferences("console_state", Context.MODE_PRIVATE).edit().putString(stateKey, latestOutput.takeLast(30000)).apply()
+            console.close()
+        }
+    }
+
+    LaunchedEffect(node, connected) {
+        if (connected) while (true) {
+            delay(15000)
+            if (connected) console.ping()
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(node.node + " • Shell") },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Natrag") } },
+                actions = {
+                    TextButton(enabled = output.isNotBlank(), onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(output)) }) { Text("Kopiraj") }
+                    Text(if (connected) "● LIVE" else if (connecting) "○ spajanje" else "○ offline", Modifier.padding(end = 8.dp))
+                }
+            )
+        }
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).padding(8.dp)) {
+            Surface(Modifier.fillMaxWidth().weight(1f)) {
+                SelectionContainer { Text(output, Modifier.fillMaxSize().padding(8.dp), style = MaterialTheme.typography.bodySmall) }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                OutlinedButton({ clipboard.setText(androidx.compose.ui.text.AnnotatedString(output)) }, enabled=output.isNotBlank(), modifier=Modifier.weight(1f)) { Text("Kopiraj sve") }
+                OutlinedButton({ output="" }, modifier=Modifier.weight(1f)) { Text("Očisti") }
+            }
+            if (error != null) Text(error!!, color = MaterialTheme.colorScheme.error)
+            Row(Modifier.fillMaxWidth(), verticalAlignment=Alignment.CenterVertically) {
+                OutlinedTextField(input, { input=it }, Modifier.weight(1f), label={Text("Unos")}, singleLine=true, enabled=connected)
+                Spacer(Modifier.width(6.dp))
+                Button({ console.send(input+"\n"); input="" }, enabled=connected && input.isNotEmpty()) { Text("Pošalji") }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                TextButton({ console.send("\u0003") }, enabled=connected) { Text("Ctrl+C") }
+                TextButton({ console.send("\u0004") }, enabled=connected) { Text("Ctrl+D") }
+                TextButton({ console.send("\t") }, enabled=connected) { Text("Tab") }
+                TextButton({ console.send("\u001b[A") }, enabled=connected) { Text("↑") }
+                TextButton({ console.send("\u001b[B") }, enabled=connected) { Text("↓") }
+            }
+        }
+    }
 }
 
 @Composable
