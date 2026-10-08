@@ -927,6 +927,8 @@ private fun VmCard(
             Spacer(Modifier.height(8.dp))
             OutlinedButton({ onFirewall(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.Security, null); Spacer(Modifier.width(4.dp)); Text("Firewall") }
             Spacer(Modifier.height(8.dp))
+            OutlinedButton({ onClone(vm) }, enabled=!busy && vm.isQemu, modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.ContentCopy, null); Spacer(Modifier.width(4.dp)); Text("Kloniraj QEMU VM") }
+            Spacer(Modifier.height(8.dp))
             OutlinedButton(
                 { showSnapshot = true; snapshotName = ""; snapshotDescription = "" },
                 enabled = !busy,
