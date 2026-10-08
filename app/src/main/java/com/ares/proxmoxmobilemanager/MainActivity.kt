@@ -424,7 +424,6 @@ private fun Dashboard(
     onSettings: () -> Unit,
     onConsole: (ProxmoxVm) -> Unit,
     onSnapshot: (ProxmoxVm, String, String) -> Unit,
-    onFirewall: (ProxmoxVm) -> Unit,
     onUpdateAll: () -> Unit,
     updateAllBusy: Boolean,
     updateStatuses: Map<String, String>,
