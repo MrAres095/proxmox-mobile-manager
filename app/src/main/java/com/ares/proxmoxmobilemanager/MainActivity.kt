@@ -799,8 +799,6 @@ private fun Dashboard(
                     }
                 }
             },
-                }
-            },
             confirmButton = { TextButton(onClick = { firewallVm = null }) { Text("Zatvori") } }
         )
     }
