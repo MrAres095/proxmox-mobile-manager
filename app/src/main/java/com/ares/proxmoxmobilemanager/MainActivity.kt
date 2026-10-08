@@ -460,6 +460,18 @@ private fun Dashboard(
     var firewallVm by remember { mutableStateOf<ProxmoxVm?>(null) }
     var firewallRules by remember { mutableStateOf<List<ProxmoxFirewallRule>>(emptyList()) }
     var firewallLoading by remember { mutableStateOf(false) }
+    var addFirewallRuleOpen by remember { mutableStateOf(false) }
+    var firewallAction by remember { mutableStateOf("ACCEPT") }
+    var firewallType by remember { mutableStateOf("in") }
+    var firewallEnable by remember { mutableStateOf(true) }
+    var firewallComment by remember { mutableStateOf("") }
+    var firewallIface by remember { mutableStateOf("") }
+    var firewallSource by remember { mutableStateOf("") }
+    var firewallDest by remember { mutableStateOf("") }
+    var firewallProto by remember { mutableStateOf("") }
+    var firewallDport by remember { mutableStateOf("") }
+    var firewallSport by remember { mutableStateOf("") }
+    var firewallAddLoading by remember { mutableStateOf(false) }
     var cloneVmState by remember { mutableStateOf<ProxmoxVm?>(null) }
     var cloneId by remember { mutableStateOf("") }
     var cloneName by remember { mutableStateOf("") }
@@ -759,10 +771,29 @@ private fun Dashboard(
             onDismissRequest = { firewallVm = null },
             title = { Text("${vm.name} • Firewall") },
             text = {
-                when {
-                    firewallLoading -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
-                    firewallRules.isEmpty() -> Text("Nema firewall pravila ili ih Proxmox nije vratio.")
-                    else -> LazyColumn(Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
+                Column(Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = {
+                            firewallAction = "ACCEPT"
+                            firewallType = "in"
+                            firewallEnable = true
+                            firewallComment = ""
+                            firewallIface = ""
+                            firewallSource = ""
+                            firewallDest = ""
+                            firewallProto = ""
+                            firewallDport = ""
+                            firewallSport = ""
+                            addFirewallRuleOpen = true
+                        },
+                        enabled = !firewallAddLoading,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("＋ Novo firewall pravilo") }
+                    Spacer(Modifier.height(8.dp))
+                    when {
+                        firewallLoading -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
+                        firewallRules.isEmpty() -> Text("Nema firewall pravila ili ih Proxmox nije vratio.")
+                        else -> LazyColumn(Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
                         items(firewallRules, key = { it.pos }) { rule ->
                             Column(Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
                                 Text("${rule.pos}. ${rule.action.uppercase()} • ${rule.type.ifBlank { "rule" }}", style = MaterialTheme.typography.titleSmall)
@@ -799,6 +830,78 @@ private fun Dashboard(
             confirmButton = { TextButton(onClick = { firewallVm = null }) { Text("Zatvori") } }
         )
     }
+    if (addFirewallRuleOpen && firewallVm != null) {
+        val vm = firewallVm!!
+        AlertDialog(
+            onDismissRequest = { if (!firewallAddLoading) addFirewallRuleOpen = false },
+            title = { Text("${vm.name} • Novo firewall pravilo") },
+            text = {
+                Column(
+                    Modifier.fillMaxWidth().heightIn(max = 560.dp)
+                        .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("ACCEPT", "DROP", "REJECT").forEach { value ->
+                            FilterChip(
+                                selected = firewallAction == value,
+                                onClick = { firewallAction = value },
+                                label = { Text(value) }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("in", "out").forEach { value ->
+                            FilterChip(
+                                selected = firewallType == value,
+                                onClick = { firewallType = value },
+                                label = { Text(value.uppercase()) }
+                            )
+                        }
+                    }
+                    OutlinedTextField(firewallComment, { firewallComment = it }, Modifier.fillMaxWidth(), label = { Text("Komentar") }, singleLine = true)
+                    OutlinedTextField(firewallIface, { firewallIface = it }, Modifier.fillMaxWidth(), label = { Text("Interface (npr. net0)") }, singleLine = true)
+                    OutlinedTextField(firewallSource, { firewallSource = it }, Modifier.fillMaxWidth(), label = { Text("Source CIDR") }, singleLine = true)
+                    OutlinedTextField(firewallDest, { firewallDest = it }, Modifier.fillMaxWidth(), label = { Text("Destination CIDR") }, singleLine = true)
+                    OutlinedTextField(firewallProto, { firewallProto = it }, Modifier.fillMaxWidth(), label = { Text("Protocol (tcp/udp/icmp)") }, singleLine = true)
+                    OutlinedTextField(firewallDport, { firewallDport = it }, Modifier.fillMaxWidth(), label = { Text("Destination port") }, singleLine = true)
+                    OutlinedTextField(firewallSport, { firewallSport = it }, Modifier.fillMaxWidth(), label = { Text("Source port") }, singleLine = true)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = firewallEnable, onCheckedChange = { firewallEnable = it })
+                        Text("Pravilo odmah uključeno")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !firewallAddLoading,
+                    onClick = {
+                        firewallAddLoading = true
+                        scope.launch {
+                            try {
+                                api.addFirewallRule(
+                                    base, connection, vm, firewallAction, firewallType, firewallEnable,
+                                    firewallComment, firewallIface, firewallSource, firewallDest,
+                                    firewallProto, firewallDport, firewallSport
+                                )
+                                firewallRules = api.getFirewallRules(base, connection, vm)
+                                actionMessage = "Firewall pravilo dodano."
+                                addFirewallRuleOpen = false
+                            } catch (e: Exception) {
+                                actionMessage = e.message ?: "Dodavanje firewall pravila nije uspjelo."
+                            } finally {
+                                firewallAddLoading = false
+                            }
+                        }
+                    }
+                ) { Text(if (firewallAddLoading) "Dodavanje..." else "Dodaj") }
+            },
+            dismissButton = {
+                TextButton(enabled = !firewallAddLoading, onClick = { addFirewallRuleOpen = false }) { Text("Odustani") }
+            }
+        )
+    }
+
     if (tasksVm != null) {
         val vm = tasksVm!!
         AlertDialog(
