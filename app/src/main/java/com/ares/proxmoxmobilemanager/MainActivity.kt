@@ -770,6 +770,26 @@ private fun Dashboard(
                                 val details = listOf("Interface" to rule.iface, "Source" to rule.source, "Destination" to rule.dest, "Protocol" to rule.proto, "DPort" to rule.dport, "SPort" to rule.sport).filter { it.second.isNotBlank() }
                                 details.forEach { (k,v) -> Text("$k: $v", style = MaterialTheme.typography.bodySmall) }
                                 Text(if (rule.enable) "Enabled" else "Disabled", style = MaterialTheme.typography.bodySmall)
+                                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                                    TextButton(onClick = {
+                                        scope.launch {
+                                            try {
+                                                api.setFirewallRuleEnabled(base, connection, vm, rule.pos, !rule.enable)
+                                                firewallRules = api.getFirewallRules(base, connection, vm)
+                                                actionMessage = if (rule.enable) "Firewall pravilo ${rule.pos} isključeno." else "Firewall pravilo ${rule.pos} uključeno."
+                                            } catch (e: Exception) { actionMessage = e.message ?: "Promjena firewall pravila nije uspjela." }
+                                        }
+                                    }) { Text(if (rule.enable) "Isključi" else "Uključi") }
+                                    TextButton(onClick = {
+                                        scope.launch {
+                                            try {
+                                                api.deleteFirewallRule(base, connection, vm, rule.pos)
+                                                firewallRules = api.getFirewallRules(base, connection, vm)
+                                                actionMessage = "Firewall pravilo ${rule.pos} obrisano."
+                                            } catch (e: Exception) { actionMessage = e.message ?: "Brisanje firewall pravila nije uspjelo." }
+                                        }
+                                    }) { Text("Obriši") }
+                                }
                             }
                             Divider()
                         }
