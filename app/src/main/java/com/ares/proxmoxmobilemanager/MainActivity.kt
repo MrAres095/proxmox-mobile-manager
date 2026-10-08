@@ -902,8 +902,97 @@ private fun formatBytes(value: Long): String {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,onBack:()->Unit){
- val scope=rememberCoroutineScope(); var output by remember{mutableStateOf("Spajanje na Proxmox konzolu...\n")}; var input by remember{mutableStateOf("")}; var connected by remember{mutableStateOf(false)}; var error by remember{mutableStateOf<String?>(null)}
- LaunchedEffect(vm){ scope.launch{try{console.open(base,connection,vm,{b->val t=String(b,Charsets.UTF_8);if(t=="OK")connected=true else output=(output+t).takeLast(30000)},{reason->connected=false;output+="\n[Veza zatvorena"+(reason?.let{": "+it}?: "")+"]\n"},{e->connected=false;error=e.message?:"Greška konzole"})}catch(e:Exception){connected=false;error=e.message?:"Spajanje na konzolu nije uspjelo."}} }
- LaunchedEffect(vm){ while(true){ delay(15000); if(connected) console.ping() } }
- DisposableEffect(vm){ onDispose{console.close()} }
- Scaffold(topBar={TopAppBar(title={Text(vm.name+" • Console")},navigationIcon={IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,"Natrag")}},actions={Text(if(connected)"● LIVE" else "○ povezivanje",Modifier.padding(end=12.dp))})}){p->Column(Modifier.fillMaxSize().padding(p).padding(8.dp)){Surface(Modifier.fillMaxWidth().weight(1f)){SelectionContainer{Text(output,Modifier.fillMaxSize().padding(8.dp),style=MaterialTheme.typography.bodySmall)}};if(error!=null)Text(error!!,color=MaterialTheme.colorScheme.error);Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){OutlinedTextField(input,{input=it},Modifier.weight(1f),label={Text("Unos")},singleLine=true,enabled=connected);Spacer(Modifier.width(6.dp));Button({console.send(input+"\n");input=""},enabled=connected&&input.isNotEmpty()){Text("Pošalji")}};Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){TextButton({console.send("\u0003")},enabled=connected){Text("Ctrl+C")};TextButton({console.send("\u0004")},enabled=connected){Text("Ctrl+D")};TextButton({console.send("\t")},enabled=connected){Text("Tab")};TextButton({console.send("\u001b[A")},enabled=connected){Text("↑")};TextButton({console.send("\u001b[B")},enabled=connected){Text("↓")}}}}}
+ val scope=rememberCoroutineScope()
+ val lifecycleOwner=androidx.lifecycle.compose.LocalLifecycleOwner.current
+ val clipboard=androidx.compose.ui.platform.LocalClipboardManager.current
+ var output by remember{mutableStateOf("Spajanje na Proxmox konzolu...\n")}
+ var input by remember{mutableStateOf("")}
+ var connected by remember{mutableStateOf(false)}
+ var connecting by remember{mutableStateOf(false)}
+ var error by remember{mutableStateOf<String?>(null)}
+
+ fun connect(){
+  if(connecting) return
+  connecting=true
+  error=null
+  scope.launch{
+   try{
+    console.open(base,connection,vm,{b->
+     val t=String(b,Charsets.UTF_8)
+     if(t=="OK") connected=true else output=(output+t).takeLast(50000)
+    },{reason->
+     connected=false
+     if(reason!=null) output=(output+"\n[Veza zatvorena: "+reason+"]\n").takeLast(50000)
+    },{e->
+     connected=false
+     error=e.message?:"Greška konzole"
+    })
+   }catch(e:Exception){
+    connected=false
+    error=e.message?:"Spajanje na konzolu nije uspjelo."
+   }finally{
+    connecting=false
+   }
+  }
+ }
+
+ LaunchedEffect(vm){ connect() }
+
+ androidx.compose.runtime.DisposableEffect(lifecycleOwner,vm){
+  val observer=androidx.lifecycle.LifecycleEventObserver{_,event->
+   if(event==androidx.lifecycle.Lifecycle.Event.ON_RESUME && !connected) connect()
+  }
+  lifecycleOwner.lifecycle.addObserver(observer)
+  onDispose{
+   lifecycleOwner.lifecycle.removeObserver(observer)
+   console.close()
+  }
+ }
+
+ LaunchedEffect(vm){
+  while(true){
+   delay(10000)
+   if(connected) console.ping()
+   else if(!connecting) connect()
+  }
+ }
+
+ Scaffold(
+  topBar={TopAppBar(
+   title={Text(vm.name+" • Console")},
+   navigationIcon={IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,"Natrag")}},
+   actions={
+    TextButton(
+     enabled=output.isNotBlank(),
+     onClick={clipboard.setText(androidx.compose.ui.text.AnnotatedString(output))}
+    ){Text("Kopiraj")}
+    Text(if(connected)"● LIVE" else if(connecting)"○ spajanje" else "○ offline",Modifier.padding(end=8.dp))
+   }
+  )}
+ ){p->
+  Column(Modifier.fillMaxSize().padding(p).padding(8.dp)){
+   Surface(Modifier.fillMaxWidth().weight(1f)){
+    SelectionContainer{
+     Text(output,Modifier.fillMaxSize().padding(8.dp),style=MaterialTheme.typography.bodySmall)
+    }
+   }
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+    OutlinedButton({clipboard.setText(androidx.compose.ui.text.AnnotatedString(output))},enabled=output.isNotBlank(),modifier=Modifier.weight(1f)){Text("Kopiraj sve")}
+    OutlinedButton({output="";error=null},modifier=Modifier.weight(1f)){Text("Očisti")}
+   }
+   if(error!=null)Text(error!!,color=MaterialTheme.colorScheme.error)
+   Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
+    OutlinedTextField(input,{input=it},Modifier.weight(1f),label={Text("Unos")},singleLine=true,enabled=connected)
+    Spacer(Modifier.width(6.dp))
+    Button({console.send(input+"\n");input=""},enabled=connected&&input.isNotEmpty()){Text("Pošalji")}
+   }
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+    TextButton({console.send("\u0003")},enabled=connected){Text("Ctrl+C")}
+    TextButton({console.send("\u0004")},enabled=connected){Text("Ctrl+D")}
+    TextButton({console.send("\t")},enabled=connected){Text("Tab")}
+    TextButton({console.send("\u001b[A")},enabled=connected){Text("↑")}
+    TextButton({console.send("\u001b[B")},enabled=connected){Text("↓")}
+   }
+  }
+ }
+}
