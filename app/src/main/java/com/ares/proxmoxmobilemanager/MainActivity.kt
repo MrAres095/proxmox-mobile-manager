@@ -460,6 +460,11 @@ private fun Dashboard(
     var firewallVm by remember { mutableStateOf<ProxmoxVm?>(null) }
     var firewallRules by remember { mutableStateOf<List<ProxmoxFirewallRule>>(emptyList()) }
     var firewallLoading by remember { mutableStateOf(false) }
+    var cloneVmState by remember { mutableStateOf<ProxmoxVm?>(null) }
+    var cloneId by remember { mutableStateOf("") }
+    var cloneName by remember { mutableStateOf("") }
+    var cloneFull by remember { mutableStateOf(true) }
+    var cloneLoading by remember { mutableStateOf(false) }
     var tasks by remember { mutableStateOf<List<ProxmoxTask>>(emptyList()) }
     var tasksLoading by remember { mutableStateOf(false) }
     var nodeTasksNode by remember { mutableStateOf<String?>(null) }
@@ -619,6 +624,16 @@ private fun Dashboard(
                         try { firewallRules = api.getFirewallRules(base, connection, selected) }
                         catch (e: Exception) { actionMessage = e.message ?: "Firewall pravila se ne mogu učitati." }
                         finally { firewallLoading = false }
+                    }
+                }, onClone = { selected ->
+                    cloneVmState = selected
+                    if (selected.isQemu) {
+                        cloneId = ""
+                        cloneName = selected.name + "-clone"
+                        cloneFull = true
+                    } else {
+                        cloneVmState = null
+                        actionMessage = "Clone je trenutno omogućen samo za QEMU VM."
                     }
                 }, onTasks = { selected ->
                     tasksVm = selected
@@ -844,6 +859,42 @@ private fun Dashboard(
         )
     }
 
+    if (cloneVmState != null) {
+        val vm = cloneVmState!!
+        AlertDialog(
+            onDismissRequest = { if (!cloneLoading) cloneVmState = null },
+            title = { Text("${vm.name} • Kloniraj VM") },
+            text = {
+                Column {
+                    OutlinedTextField(value = cloneId, onValueChange = { cloneId = it.filter(Char::isDigit).take(6) }, label = { Text("Novi VMID") }, placeholder = { Text("npr. 120") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(value = cloneName, onValueChange = { cloneName = it.take(80) }, label = { Text("Naziv klona") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = cloneFull, onCheckedChange = { cloneFull = it }, enabled = !cloneLoading)
+                        Text("Full clone (kopira diskove)")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = !cloneLoading && cloneId.toIntOrNull() != null && cloneName.isNotBlank(), onClick = {
+                    val newId = cloneId.toIntOrNull() ?: return@TextButton
+                    cloneLoading = true
+                    scope.launch {
+                        try {
+                            api.cloneVm(base, connection, vm, newId, cloneName.trim(), cloneFull)
+                            vms = api.getVms(base, connection)
+                            actionMessage = "VM ${vm.name} je kloniran kao ${cloneName.trim()} (VMID $newId)."
+                            cloneVmState = null
+                        } catch (e: Exception) { actionMessage = e.message ?: "Kloniranje nije uspjelo." }
+                        finally { cloneLoading = false }
+                    }
+                }) { Text(if (cloneLoading) "Kloniranje..." else "Kloniraj") }
+            },
+            dismissButton = { TextButton(enabled = !cloneLoading, onClick = { cloneVmState = null }) { Text("Odustani") } }
+        )
+    }
+
     if (actionMessage != null) {
         AlertDialog(onDismissRequest={actionMessage=null},title={Text("Proxmox")},text={Text(actionMessage!!)},confirmButton={TextButton(onClick={actionMessage=null}){Text("OK")}})
     }
@@ -894,6 +945,7 @@ private fun VmCard(
     onSnapshots: (ProxmoxVm) -> Unit,
     onTasks: (ProxmoxVm) -> Unit,
     onFirewall: (ProxmoxVm) -> Unit,
+    onClone: (ProxmoxVm) -> Unit,
     onDetails: (ProxmoxVm) -> Unit
 ) {
     var confirmAction by remember { mutableStateOf<VmAction?>(null) }
