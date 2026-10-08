@@ -152,6 +152,14 @@ fun ProxmoxApp() {
                             }
                         }
                     },
+                    onBackup = { vm ->
+                        vmLoading = true
+                        scope.launch {
+                            try { api.backupVm(connectedBase!!, connection, vm); vms = api.getVms(connectedBase!!, connection); error = null }
+                            catch (e: Exception) { error = e.message ?: "Backup nije uspio." }
+                            finally { vmLoading = false }
+                        }
+                    },
                     onUpdateAll = {
                         if (!updatingAll) {
                             updatingAll = true
@@ -424,6 +432,7 @@ private fun Dashboard(
     onSettings: () -> Unit,
     onConsole: (ProxmoxVm) -> Unit,
     onSnapshot: (ProxmoxVm, String, String) -> Unit,
+    onBackup: (ProxmoxVm) -> Unit,
     onUpdateAll: () -> Unit,
     updateAllBusy: Boolean,
     updateStatuses: Map<String, String>,
@@ -598,6 +607,7 @@ private fun Dashboard(
                         catch (e: Exception) { actionMessage = e.message ?: "Snapshoti se ne mogu učitati." }
                         finally { snapshotsLoading = false }
                     }
+                }, onBackup = { selected -> onBackup(selected)
                 }, onFirewall = { selected ->
                     firewallVm = selected
                     firewallRules = emptyList()
@@ -831,6 +841,7 @@ private fun VmCard(
     onAction: (ProxmoxVm, VmAction) -> Unit,
     onConsole: (ProxmoxVm) -> Unit,
     onSnapshot: (ProxmoxVm, String, String) -> Unit,
+    onBackup: (ProxmoxVm) -> Unit,
     onEditConfig: (ProxmoxVm) -> Unit,
     onSnapshots: (ProxmoxVm) -> Unit,
     onTasks: (ProxmoxVm) -> Unit,
@@ -863,6 +874,8 @@ private fun VmCard(
                 OutlinedButton({ onEditConfig(vm) }, enabled=!busy, modifier=Modifier.weight(1f)) { Text("Uredi") }
                 OutlinedButton({ onSnapshots(vm) }, enabled=!busy, modifier=Modifier.weight(1f)) { Text("Snapshoti") }
             }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton({ onBackup(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.Backup, null); Spacer(Modifier.width(4.dp)); Text("Backup") }
             Spacer(Modifier.height(8.dp))
             OutlinedButton({ onFirewall(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.Security, null); Spacer(Modifier.width(4.dp)); Text("Firewall") }
             Spacer(Modifier.height(8.dp))
