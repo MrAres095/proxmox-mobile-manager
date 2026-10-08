@@ -447,6 +447,9 @@ private fun Dashboard(
     var snapshots by remember { mutableStateOf<List<Pair<String,String>>>(emptyList()) }
     var snapshotsLoading by remember { mutableStateOf(false) }
     var actionMessage by remember { mutableStateOf<String?>(null) }
+    var tasksVm by remember { mutableStateOf<ProxmoxVm?>(null) }
+    var tasks by remember { mutableStateOf<List<ProxmoxTask>>(emptyList()) }
+    var tasksLoading by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         updateChecking = true
@@ -592,6 +595,15 @@ private fun Dashboard(
                         catch (e: Exception) { actionMessage = e.message ?: "Snapshoti se ne mogu učitati." }
                         finally { snapshotsLoading = false }
                     }
+                }, onTasks = { selected ->
+                    tasksVm = selected
+                    tasks = emptyList()
+                    tasksLoading = true
+                    scope.launch {
+                        try { tasks = api.getTasks(base, connection, selected) }
+                        catch (e: Exception) { actionMessage = e.message ?: "Povijest zadataka se ne može učitati." }
+                        finally { tasksLoading = false }
+                    }
                 }, onDetails = { selected ->
                     detailsVm = selected
                     detailsConfig = null
@@ -643,6 +655,32 @@ private fun Dashboard(
         }
 
     
+    if (tasksVm != null) {
+        val vm = tasksVm!!
+        AlertDialog(
+            onDismissRequest = { tasksVm = null },
+            title = { Text("${vm.name} • Povijest zadataka") },
+            text = {
+                when {
+                    tasksLoading -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
+                    tasks.isEmpty() -> Text("Nema zabilježenih zadataka.")
+                    else -> LazyColumn(Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
+                        items(tasks, key = { it.upid }) { task ->
+                            Column(Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
+                                Text(task.type.ifBlank { "task" }, style = MaterialTheme.typography.titleSmall)
+                                Text("Status: ${task.status.ifBlank { "—" }}")
+                                if (task.exitStatus.isNotBlank()) Text("Rezultat: ${task.exitStatus}")
+                                if (task.user.isNotBlank()) Text("Korisnik: ${task.user}", style = MaterialTheme.typography.bodySmall)
+                            }
+                            Divider()
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { tasksVm = null }) { Text("Zatvori") } }
+        )
+    }
+
     if (editVm != null) {
         val vm = editVm!!
         var config by remember(vm.vmid, vm.node) { mutableStateOf<Map<String,String>>(emptyMap()) }
@@ -757,6 +795,7 @@ private fun VmCard(
     onSnapshot: (ProxmoxVm, String, String) -> Unit,
     onEditConfig: (ProxmoxVm) -> Unit,
     onSnapshots: (ProxmoxVm) -> Unit,
+    onTasks: (ProxmoxVm) -> Unit,
     onDetails: (ProxmoxVm) -> Unit
 ) {
     var confirmAction by remember { mutableStateOf<VmAction?>(null) }
