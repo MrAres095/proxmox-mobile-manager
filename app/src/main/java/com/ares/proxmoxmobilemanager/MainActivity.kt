@@ -42,6 +42,7 @@ fun ProxmoxApp() {
             var showSettings by remember { mutableStateOf(true) }
             var showClusterManager by remember { mutableStateOf(false) }
             var showReplication by remember { mutableStateOf(false) }
+            var selectedNode by remember { mutableStateOf<ProxmoxNode?>(null) }
             var replicationJobs by remember { mutableStateOf<List<ProxmoxReplicationJob>>(emptyList()) }
             var replicationLoading by remember { mutableStateOf(false) }
             var showUiSettings by remember { mutableStateOf(false) }
@@ -141,6 +142,7 @@ fun ProxmoxApp() {
                     onSettings = { showSettings = true },
                     onClusterManager = { showClusterManager = true },
                     onReplication = { showReplication = true; replicationLoading = true; scope.launch { try { replicationJobs = api.getReplicationJobs(connectedBase!!, connection) } catch (e: Exception) { error = e.message ?: "Replication se ne može učitati." } finally { replicationLoading = false } } },
+                    onNodeOpen = { selectedNode = it },
                     onConsole = { consoleVm = it },
                     onSnapshot = { vm, snapName, description ->
                         vmLoading = true
@@ -187,6 +189,7 @@ fun ProxmoxApp() {
                     clusterStatus = clusterStatus
                 )
                 if (showUiSettings) { UiSettingsDialog(theme, language, { theme = it; uiPrefs.edit().putString("theme", it).apply() }, { language = it; uiPrefs.edit().putString("language", it).apply() }, { showUiSettings = false }) }
+                if (selectedNode != null) { NodeManagementDialog(base = connectedBase!!, connection = connection, node = selectedNode!!, onDismiss = { selectedNode = null }) }
                 if (showReplication) { ReplicationDialog(jobs = replicationJobs, loading = replicationLoading, onRefresh = { replicationLoading = true; scope.launch { try { replicationJobs = api.getReplicationJobs(connectedBase!!, connection) } catch (e: Exception) { error = e.message ?: "Replication se ne može učitati." } finally { replicationLoading = false } } }, onDismiss = { showReplication = false }) }
                 if (showClusterManager) {
                     ClusterManagementDialog(
@@ -444,7 +447,8 @@ private fun Dashboard(
     error: String?,
     clusterStatus: ProxmoxClusterStatus?,
     onClusterManager: () -> Unit,
-    onReplication: () -> Unit
+    onReplication: () -> Unit,
+    onNodeOpen: (ProxmoxNode) -> Unit
 ) {
     val context = LocalContext.current
     val updater = remember { UpdateManager(context) }
@@ -697,6 +701,8 @@ private fun Dashboard(
                         Text("CPU: ${"%.1f".format(node.cpu * 100)}% / ${node.maxCpu} CPU")
                         Text("RAM: ${formatBytes(node.mem)} / ${formatBytes(node.maxMem)}")
                         Text("Uptime: ${node.uptime}s")
+                        Spacer(Modifier.height(8.dp))
+                        Button(onClick = { onNodeOpen(node) }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Dns, null); Spacer(Modifier.width(4.dp)); Text("Upravljaj serverom") }
                         Spacer(Modifier.height(8.dp))
                         OutlinedButton(
                             onClick = {
@@ -1048,6 +1054,15 @@ private fun ReplicationDialog(jobs: List<ProxmoxReplicationJob>, loading: Boolea
             }
         }
     }, confirmButton = { TextButton(onClick = onRefresh, enabled = !loading) { Text("Osvježi") } }, dismissButton = { TextButton(onClick = onDismiss, enabled = !loading) { Text("Zatvori") } })
+}
+
+@Composable
+private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, node: ProxmoxNode, onDismiss: () -> Unit) {
+    val scope = rememberCoroutineScope(); var tab by remember { mutableStateOf("summary") }; var logs by remember { mutableStateOf<List<String>>(emptyList()) }; var updates by remember { mutableStateOf<List<Pair<String,String>>>(emptyList()) }; var busy by remember { mutableStateOf(false) }; var message by remember { mutableStateOf<String?>(null) }
+    fun loadLogs() { busy=true; scope.launch { try { logs=api.getNodeSyslog(base,connection,node); message=null } catch(e:Exception){message=e.message} finally{busy=false} } }
+    fun loadUpdates() { busy=true; scope.launch { try { updates=api.getNodeAptUpdates(base,connection,node); message=null } catch(e:Exception){message=e.message} finally{busy=false} } }
+    LaunchedEffect(tab) { if(tab=="logs") loadLogs(); if(tab=="updates") loadUpdates() }
+    AlertDialog(onDismissRequest={if(!busy)onDismiss()},title={Text("Server: ${node.node}")},text={Column(Modifier.fillMaxWidth()){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){listOf("summary" to "Summary","logs" to "Syslog","updates" to "Updates").forEach{(id,label)->OutlinedButton(onClick={tab=id},enabled=!busy,modifier=Modifier.weight(1f)){Text(label)}}};Spacer(Modifier.height(8.dp));when(tab){"summary"->Column{Text("Status: ${node.status}");Text("CPU: ${"%.1f".format(node.cpu*100)}% / ${node.maxCpu} CPU");Text("RAM: ${formatBytes(node.mem)} / ${formatBytes(node.maxMem)}");Text("Uptime: ${node.uptime}s");Spacer(Modifier.height(8.dp));Text("Node management");Text("Syslog i Updates su sada dostupni; Shell, Disks, Firewall i System slijede kao zasebni moduli.")};"logs"->if(busy)CircularProgressIndicator() else LazyColumn(Modifier.heightIn(max=350.dp)){items(logs){Text(it,style=MaterialTheme.typography.bodySmall);Divider()}};else->if(busy)CircularProgressIndicator() else LazyColumn(Modifier.heightIn(max=350.dp)){items(updates){Text("${it.first}  ${it.second}")}}};if(message!=null)Text(message!!,color=MaterialTheme.colorScheme.error)}},confirmButton={TextButton(onClick=onDismiss,enabled=!busy){Text("Zatvori")}},dismissButton={TextButton(onClick={if(tab=="logs")loadLogs() else if(tab=="updates")loadUpdates()},enabled=!busy&&tab!="summary"){Text("Osvježi")}})
 }
 
 @Composable
