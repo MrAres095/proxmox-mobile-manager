@@ -70,6 +70,17 @@ data class ProxmoxTask(
     val endTime: Long
 )
 
+data class ProxmoxReplicationJob(
+    val id: String,
+    val type: String,
+    val target: String,
+    val schedule: String,
+    val state: String,
+    val lastSync: Long,
+    val duration: Long,
+    val failCount: Int,
+    val error: String
+)
 data class ProxmoxFirewallRule(
     val pos: Int,
     val action: String,
@@ -423,6 +434,27 @@ class ProxmoxApi {
             for (i in 0 until data.length()) {
                 val x = data.getJSONObject(i)
                 add(ProxmoxTask(x.optString("upid"), x.optString("type"), x.optString("status"), x.optString("exitstatus"), x.optString("user"), x.optLong("starttime"), x.optLong("endtime")))
+            }
+        }
+    }
+
+    suspend fun getReplicationJobs(base: String, connection: ProxmoxConnection): List<ProxmoxReplicationJob> = withContext(Dispatchers.IO) {
+        val json = request(base, "/api2/json/cluster/replication", connection, 7000)
+        val data = json.optJSONArray("data") ?: return@withContext emptyList()
+        buildList {
+            for (i in 0 until data.length()) {
+                val x = data.getJSONObject(i)
+                add(ProxmoxReplicationJob(
+                    id = x.optString("id"),
+                    type = x.optString("type"),
+                    target = x.optString("target"),
+                    schedule = x.optString("schedule"),
+                    state = x.optString("state", x.optString("status")),
+                    lastSync = x.optLong("last_sync"),
+                    duration = x.optLong("duration"),
+                    failCount = x.optInt("fail_count"),
+                    error = x.optString("error")
+                ))
             }
         }
     }
