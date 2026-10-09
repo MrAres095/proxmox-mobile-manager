@@ -1585,7 +1585,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
   Column(Modifier.fillMaxSize().padding(p).padding(8.dp)){
    Surface(Modifier.fillMaxWidth().weight(1f), color=androidx.compose.ui.graphics.Color(0xFF020506), shape=MaterialTheme.shapes.medium){
     SelectionContainer{
-     Text(output,Modifier.fillMaxSize().padding(10.dp),color=androidx.compose.ui.graphics.Color(0xFFD6F4E1),style=MaterialTheme.typography.bodySmall.copy(fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace,lineHeight=androidx.compose.ui.unit.sp(14)))
+     Text(output,Modifier.fillMaxSize().padding(10.dp),color=androidx.compose.ui.graphics.Color(0xFFD6F4E1),style=MaterialTheme.typography.bodySmall.copy(fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace,lineHeight=14.sp))
     }
    }
    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
