@@ -1495,14 +1495,24 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
  val lifecycleOwner=androidx.lifecycle.compose.LocalLifecycleOwner.current
  val clipboard=androidx.compose.ui.platform.LocalClipboardManager.current
  val context=androidx.compose.ui.platform.LocalContext.current
+ val focusManager=androidx.compose.ui.platform.LocalFocusManager.current
  val consolePrefs=remember{context.getSharedPreferences("console_state", Context.MODE_PRIVATE)}
  val stateKey=remember(base,vm.node,vm.vmid){"console_"+base.hashCode()+"_"+vm.node+"_"+vm.vmid}
- var output by remember(stateKey){mutableStateOf(consolePrefs.getString(stateKey,"Spajanje na Proxmox konzolu...\\n")?:"Spajanje na Proxmox konzolu...\\n")}
+ var output by remember(stateKey){mutableStateOf(consolePrefs.getString(stateKey,"Spajanje na Proxmox konzolu...\n")?:"Spajanje na Proxmox konzolu...\n")}
  val latestOutput by rememberUpdatedState(output)
  var input by remember{mutableStateOf("")}
  var connected by remember{mutableStateOf(false)}
  var connecting by remember{mutableStateOf(false)}
  var error by remember{mutableStateOf<String?>(null)}
+ val terminalBg=androidx.compose.ui.graphics.Color(0xFF020506)
+ val terminalFg=androidx.compose.ui.graphics.Color(0xFFD6F4E1)
+
+ fun sendCommand(){
+  if(!connected || input.isEmpty()) return
+  console.send(input+"\r")
+  input=""
+  focusManager.clearFocus()
+ }
 
  fun connect(){
   if(connecting) return
@@ -1574,18 +1584,38 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
    title={Text("Console · "+vm.name)},
    navigationIcon={IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,"Natrag")}},
    actions={
-    TextButton(
-     enabled=output.isNotBlank(),
-     onClick={clipboard.setText(androidx.compose.ui.text.AnnotatedString(output))}
-    ){Text("Kopiraj")}
+    TextButton(enabled=output.isNotBlank(),onClick={clipboard.setText(androidx.compose.ui.text.AnnotatedString(output))}){Text("Kopiraj")}
     Text(if(connected)"● LIVE" else if(connecting)"○ spajanje" else "○ offline",Modifier.padding(end=8.dp))
    }
   )}
  ){p->
-  Column(Modifier.fillMaxSize().padding(p).padding(8.dp)){
-   Surface(Modifier.fillMaxWidth().weight(1f), color=androidx.compose.ui.graphics.Color(0xFF020506), shape=MaterialTheme.shapes.medium){
-    SelectionContainer{
-     Text(output,Modifier.fillMaxSize().padding(10.dp),color=androidx.compose.ui.graphics.Color(0xFFD6F4E1),style=MaterialTheme.typography.bodySmall.copy(fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace,lineHeight=14.sp))
+  Column(Modifier.fillMaxSize().padding(p).padding(horizontal=8.dp, vertical=6.dp), verticalArrangement=Arrangement.spacedBy(6.dp)){
+   Surface(Modifier.fillMaxWidth().weight(1f), color=terminalBg, shape=MaterialTheme.shapes.medium){
+    Column(Modifier.fillMaxSize().padding(10.dp)){
+     SelectionContainer(Modifier.weight(1f).fillMaxWidth()){
+      Text(output,Modifier.fillMaxWidth(),color=terminalFg,style=MaterialTheme.typography.bodySmall.copy(fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace,lineHeight=14.sp))
+     }
+     Row(Modifier.fillMaxWidth().padding(top=6.dp),verticalAlignment=Alignment.CenterVertically){
+      Text("›",color=androidx.compose.ui.graphics.Color(0xFF35D07F),style=MaterialTheme.typography.bodyMedium.copy(fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace))
+      Spacer(Modifier.width(8.dp))
+      androidx.compose.foundation.text.BasicTextField(
+       value=input,
+       onValueChange={input=it},
+       modifier=Modifier.weight(1f).fillMaxWidth(),
+       enabled=connected,
+       singleLine=true,
+       textStyle=MaterialTheme.typography.bodySmall.copy(color=terminalFg,fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace),
+       cursorBrush=androidx.compose.ui.graphics.SolidColor(terminalFg),
+       keyboardOptions=androidx.compose.foundation.text.KeyboardOptions(imeAction=androidx.compose.ui.text.input.ImeAction.Send, capitalization=androidx.compose.ui.text.input.KeyboardCapitalization.None),
+       keyboardActions=androidx.compose.foundation.text.KeyboardActions(onSend={sendCommand()}),
+       decorationBox={innerTextField->
+        Box(Modifier.fillMaxWidth()){
+         if(input.isEmpty()) Text(if(connected)"Upiši ili zalijepi naredbu…" else "Čekam vezu s konzolom…",color=terminalFg.copy(alpha=0.55f),style=MaterialTheme.typography.bodySmall.copy(fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace))
+         innerTextField()
+        }
+       }
+      )
+     }
     }
    }
    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
@@ -1593,12 +1623,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
     OutlinedButton({output="";error=null},modifier=Modifier.weight(1f)){Text("Očisti")}
    }
    if(error!=null)Text(error!!,color=MaterialTheme.colorScheme.error)
-   Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
-    OutlinedTextField(input,{input=it},Modifier.weight(1f),label={Text("Upiši naredbu…")},singleLine=true,enabled=connected,textStyle=MaterialTheme.typography.bodyMedium.copy(fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace))
-    Spacer(Modifier.width(6.dp))
-    Button({console.send(input+"\n");input=""},enabled=connected&&input.isNotEmpty()){Text("Pošalji")}
-   }
-   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){
     TextButton({console.send("\u0003")},enabled=connected){Text("Ctrl+C")}
     TextButton({console.send("\u0004")},enabled=connected){Text("Ctrl+D")}
     TextButton({console.send("\t")},enabled=connected){Text("Tab")}
