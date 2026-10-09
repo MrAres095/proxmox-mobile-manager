@@ -281,6 +281,10 @@ class ProxmoxApi {
             }
         }
 
+    suspend fun controlNode(base: String, connection: ProxmoxConnection, node: ProxmoxNode, action: String) {
+        require(action == "reboot" || action == "shutdown") { "Nepoznata radnja za node." }
+        post(base, "/api2/json/nodes/${URLEncoder.encode(node.node, "UTF-8")}/status", connection, 10000, "command=" + URLEncoder.encode(action, "UTF-8"))
+    }
     suspend fun getNodes(base: String, connection: ProxmoxConnection): List<ProxmoxNode> =
         withContext(Dispatchers.IO) {
             val json = request(base, "/api2/json/nodes", connection, 7000)
