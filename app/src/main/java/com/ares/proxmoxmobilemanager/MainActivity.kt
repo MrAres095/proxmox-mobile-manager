@@ -525,7 +525,7 @@ private fun Dashboard(
             else -> true
         }
         matchesQuery && matchesStatus
-    }.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.storage }.thenBy { it.node })
+    }.sortedWith(compareBy<ProxmoxStorage> { it.storage.lowercase() }.thenBy { it.node.lowercase() })
 
     LaunchedEffect(Unit) {
         updateChecking = true
