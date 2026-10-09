@@ -1068,6 +1068,7 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
 }
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: ProxmoxNode, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
