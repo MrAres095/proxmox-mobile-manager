@@ -281,6 +281,24 @@ class ProxmoxApi {
             }
         }
 
+    suspend fun getNodeDisks(base: String, connection: ProxmoxConnection, node: ProxmoxNode): List<String> =
+        withContext(Dispatchers.IO) {
+            val path = "/api2/json/nodes/${URLEncoder.encode(node.node, "UTF-8")}/disks/list"
+            val data = request(base, path, connection, 10000).optJSONArray("data") ?: return@withContext emptyList()
+            buildList {
+                for (i in 0 until data.length()) {
+                    val item = data.optJSONObject(i) ?: continue
+                    val path = item.optString("devpath", item.optString("path", "Nepoznat uređaj"))
+                    val model = item.optString("model", "Model nije naveden")
+                    val size = item.optLong("size", 0L)
+                    val sizeText = if (size > 0L) String.format(java.util.Locale.getDefault(), "%.1f GB", size / 1_000_000_000.0) else "Veličina nije dostupna"
+                    val type = item.optString("type", "disk")
+                    val usage = if (item.optBoolean("used")) "U upotrebi" else "Slobodan / neoznačen"
+                    add("$path  •  $model  •  $sizeText  •  $type  •  $usage")
+                }
+            }
+        }
+
     suspend fun controlNode(base: String, connection: ProxmoxConnection, node: ProxmoxNode, action: String) {
         require(action == "reboot" || action == "shutdown") { "Nepoznata radnja za node." }
         post(base, "/api2/json/nodes/${URLEncoder.encode(node.node, "UTF-8")}/status", connection, 10000, "command=" + URLEncoder.encode(action, "UTF-8"))
