@@ -37,7 +37,20 @@ fun ProxmoxApp() {
     val uiPrefs = remember { context.getSharedPreferences("ui_preferences", Context.MODE_PRIVATE) }
     var theme by remember { mutableStateOf(uiPrefs.getString("theme", "system") ?: "system") }
     val dark = when (theme) { "dark" -> true; "light" -> false; else -> isSystemInDarkTheme() }
-    MaterialTheme(colorScheme = if (dark) darkColorScheme() else lightColorScheme()) {
+    val appColors = if (dark) darkColorScheme(
+        primary = androidx.compose.ui.graphics.Color(0xFF18C6D8),
+        onPrimary = androidx.compose.ui.graphics.Color(0xFF00191D),
+        secondary = androidx.compose.ui.graphics.Color(0xFF35D07F),
+        background = androidx.compose.ui.graphics.Color(0xFF05090C),
+        surface = androidx.compose.ui.graphics.Color(0xFF10181D),
+        surfaceVariant = androidx.compose.ui.graphics.Color(0xFF1A252C),
+        onSurface = androidx.compose.ui.graphics.Color(0xFFE4F0F4),
+        onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFF9BB0B9)
+    ) else lightColorScheme(
+        primary = androidx.compose.ui.graphics.Color(0xFF007C91),
+        secondary = androidx.compose.ui.graphics.Color(0xFF16894F)
+    )
+    MaterialTheme(colorScheme = appColors) {
         Surface(modifier = Modifier.fillMaxSize()) {
             var showSettings by remember { mutableStateOf(true) }
             var showClusterManager by remember { mutableStateOf(false) }
@@ -1557,7 +1570,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
 
  Scaffold(
   topBar={TopAppBar(
-   title={Text(vm.name+" • Console")},
+   title={Text("Console · "+vm.name)},
    navigationIcon={IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,"Natrag")}},
    actions={
     TextButton(
@@ -1569,9 +1582,9 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
   )}
  ){p->
   Column(Modifier.fillMaxSize().padding(p).padding(8.dp)){
-   Surface(Modifier.fillMaxWidth().weight(1f)){
+   Surface(Modifier.fillMaxWidth().weight(1f), color=androidx.compose.ui.graphics.Color(0xFF020506), shape=MaterialTheme.shapes.medium){
     SelectionContainer{
-     Text(output,Modifier.fillMaxSize().padding(8.dp),style=MaterialTheme.typography.bodySmall)
+     Text(output,Modifier.fillMaxSize().padding(10.dp),color=androidx.compose.ui.graphics.Color(0xFFD6F4E1),style=MaterialTheme.typography.bodySmall.copy(fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace,lineHeight=androidx.compose.ui.unit.sp(14)))
     }
    }
    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
@@ -1580,7 +1593,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
    }
    if(error!=null)Text(error!!,color=MaterialTheme.colorScheme.error)
    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
-    OutlinedTextField(input,{input=it},Modifier.weight(1f),label={Text("Unos")},singleLine=true,enabled=connected)
+    OutlinedTextField(input,{input=it},Modifier.weight(1f),label={Text("Upiši naredbu…")},singleLine=true,enabled=connected,textStyle=MaterialTheme.typography.bodyMedium.copy(fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace))
     Spacer(Modifier.width(6.dp))
     Button({console.send(input+"\n");input=""},enabled=connected&&input.isNotEmpty()){Text("Pošalji")}
    }
