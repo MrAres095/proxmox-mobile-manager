@@ -489,6 +489,18 @@ private fun Dashboard(
     var nodeTasksNode by remember { mutableStateOf<String?>(null) }
     var nodeTasks by remember { mutableStateOf<List<ProxmoxTask>>(emptyList()) }
     var nodeTasksLoading by remember { mutableStateOf(false) }
+    var resourceQuery by remember { mutableStateOf("") }
+    var resourceStatusFilter by remember { mutableStateOf("all") }
+    val filteredVms = vms.filter { vm ->
+        val query = resourceQuery.trim()
+        val matchesQuery = query.isBlank() || vm.name.contains(query, ignoreCase = true) || vm.vmid.toString().contains(query) || vm.node.contains(query, ignoreCase = true) || vm.type.contains(query, ignoreCase = true)
+        val matchesStatus = when (resourceStatusFilter) {
+            "running" -> vm.status.equals("running", ignoreCase = true)
+            "stopped" -> !vm.status.equals("running", ignoreCase = true)
+            else -> true
+        }
+        matchesQuery && matchesStatus
+    }
 
     LaunchedEffect(Unit) {
         updateChecking = true
@@ -619,11 +631,31 @@ private fun Dashboard(
                 }
             }
             item { Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { Text("Replication", style = MaterialTheme.typography.titleLarge); Spacer(Modifier.height(6.dp)); Text("Pregled Proxmox replication jobova između nodeova."); Spacer(Modifier.height(10.dp)); Button(onClick = onReplication, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Sync, contentDescription = null); Spacer(Modifier.width(6.dp)); Text("Otvori Replication") } } } }
-            item { Text("Virtualne mašine i LXC", style = MaterialTheme.typography.headlineSmall) }
+            item {
+                Text("Virtualne mašine i LXC", style = MaterialTheme.typography.headlineSmall)
+                Spacer(Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = resourceQuery,
+                    onValueChange = { resourceQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Traži VM/LXC") },
+                    placeholder = { Text("Naziv, VMID ili node") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    trailingIcon = { if (resourceQuery.isNotEmpty()) IconButton(onClick = { resourceQuery = "" }) { Icon(Icons.Default.Close, contentDescription = "Očisti pretragu") } }
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = resourceStatusFilter == "all", onClick = { resourceStatusFilter = "all" }, label = { Text("Sve (${vms.size})") })
+                    FilterChip(selected = resourceStatusFilter == "running", onClick = { resourceStatusFilter = "running" }, label = { Text("Pokrenute") })
+                    FilterChip(selected = resourceStatusFilter == "stopped", onClick = { resourceStatusFilter = "stopped" }, label = { Text("Zaustavljene") })
+                }
+                if (filteredVms.size != vms.size) Text("Prikazano ${filteredVms.size} od ${vms.size}", style = MaterialTheme.typography.bodySmall)
+            }
             if (vmLoading && vms.isEmpty()) {
                 item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() } }
             }
-            items(vms, key = { it.node + "-" + it.type + "-" + it.vmid }) { vm ->
+            items(filteredVms, key = { it.node + "-" + it.type + "-" + it.vmid }) { vm ->
                 VmCard(vm, vmLoading, onVmAction, onConsole, onSnapshot, onEditConfig = { selected ->
                     editVm = selected
                 }, onSnapshots = { selected ->
@@ -687,6 +719,7 @@ private fun Dashboard(
                 })
             }
             if (!vmLoading && vms.isEmpty()) item { Text("Nema pronađenih VM/LXC resursa.") }
+            else if (!vmLoading && filteredVms.isEmpty()) item { Text("Nema VM/LXC resursa koji odgovaraju pretrazi i odabranom filtru.") }
 
             if (loading) {
                 item {
