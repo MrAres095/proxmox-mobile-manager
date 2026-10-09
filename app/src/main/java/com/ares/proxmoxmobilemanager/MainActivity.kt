@@ -493,6 +493,8 @@ private fun Dashboard(
     var resourceStatusFilter by remember { mutableStateOf("all") }
     var resourceSort by remember { mutableStateOf("node") }
     var sortMenuExpanded by remember { mutableStateOf(false) }
+    var storageQuery by remember { mutableStateOf("") }
+    var storageStatusFilter by remember { mutableStateOf("all") }
     val filteredVms = vms.filter { vm ->
         val query = resourceQuery.trim()
         val matchesQuery = query.isBlank() || vm.name.contains(query, ignoreCase = true) || vm.vmid.toString().contains(query) || vm.node.contains(query, ignoreCase = true) || vm.type.contains(query, ignoreCase = true)
@@ -510,6 +512,20 @@ private fun Dashboard(
         "vmid" -> filteredVms.sortedBy { it.vmid }
         else -> filteredVms.sortedWith(compareBy({ it.node }, { it.vmid }))
     }
+    val filteredStorage = storage.filter { item ->
+        val query = storageQuery.trim()
+        val matchesQuery = query.isBlank() ||
+            item.storage.contains(query, ignoreCase = true) ||
+            item.node.contains(query, ignoreCase = true) ||
+            item.type.contains(query, ignoreCase = true) ||
+            item.content.contains(query, ignoreCase = true)
+        val matchesStatus = when (storageStatusFilter) {
+            "active" -> item.active
+            "inactive" -> !item.active
+            else -> true
+        }
+        matchesQuery && matchesStatus
+    }.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.storage }.thenBy { it.node })
 
     LaunchedEffect(Unit) {
         updateChecking = true
@@ -785,14 +801,67 @@ private fun Dashboard(
                 }
             }
             if (!loading && nodes.isEmpty()) item { Text("Nema pronađenih nodeova.") }
-            item { Text("Storage", style = MaterialTheme.typography.headlineSmall) }
-            items(storage, key = { it.node + "-" + it.storage }) { s ->
+            item {
+                Text("Storage", style = MaterialTheme.typography.headlineSmall)
+                OutlinedTextField(
+                    value = storageQuery,
+                    onValueChange = { storageQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Traži storage, node ili tip") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (storageQuery.isNotBlank()) {
+                            IconButton(onClick = { storageQuery = "" }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Očisti pretragu")
+                            }
+                        }
+                    },
+                    singleLine = true
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = storageStatusFilter == "all",
+                        onClick = { storageStatusFilter = "all" },
+                        label = { Text("Svi") }
+                    )
+                    FilterChip(
+                        selected = storageStatusFilter == "active",
+                        onClick = { storageStatusFilter = "active" },
+                        label = { Text("Aktivni") }
+                    )
+                    FilterChip(
+                        selected = storageStatusFilter == "inactive",
+                        onClick = { storageStatusFilter = "inactive" },
+                        label = { Text("Neaktivni") }
+                    )
+                }
+                Text("Prikazano: ${filteredStorage.size} / ${storage.size}", style = MaterialTheme.typography.bodySmall)
+            }
+            if (filteredStorage.isEmpty()) {
+                item {
+                    Text(
+                        if (storage.isEmpty()) "Nema dostupnih storage zapisa." else "Nema storage zapisa koji odgovaraju pretrazi ili filteru.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+            items(filteredStorage, key = { it.node + "-" + it.storage }) { s ->
+                val usedPercent = if (s.total > 0L) ((s.used.toDouble() / s.total.toDouble()) * 100.0).toInt().coerceIn(0, 100) else 0
                 Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text(s.storage, style = MaterialTheme.typography.titleMedium)
-                        Text("${s.node} • ${s.type} • ${if (s.active) "active" else "inactive"}")
-                        Text("Prostor: ${formatBytes(s.used)} / ${formatBytes(s.total)}")
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Storage, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(s.storage, style = MaterialTheme.typography.titleMedium)
+                        }
+                        Text("${s.node} • ${s.type} • ${if (s.active) "aktivno" else "neaktivno"}")
+                        Text("Iskorišteno: ${formatBytes(s.used)} / ${formatBytes(s.total)} ($usedPercent%)")
+                        LinearProgressIndicator(
+                            progress = { usedPercent / 100f },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                         Text("Slobodno: ${formatBytes(s.avail)}")
+                        if (s.content.isNotBlank()) Text("Sadržaj: ${s.content}", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
