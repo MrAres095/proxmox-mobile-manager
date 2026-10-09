@@ -491,6 +491,8 @@ private fun Dashboard(
     var nodeTasksLoading by remember { mutableStateOf(false) }
     var resourceQuery by remember { mutableStateOf("") }
     var resourceStatusFilter by remember { mutableStateOf("all") }
+    var resourceSort by remember { mutableStateOf("node") }
+    var sortMenuExpanded by remember { mutableStateOf(false) }
     val filteredVms = vms.filter { vm ->
         val query = resourceQuery.trim()
         val matchesQuery = query.isBlank() || vm.name.contains(query, ignoreCase = true) || vm.vmid.toString().contains(query) || vm.node.contains(query, ignoreCase = true) || vm.type.contains(query, ignoreCase = true)
@@ -500,6 +502,13 @@ private fun Dashboard(
             else -> true
         }
         matchesQuery && matchesStatus
+    }
+    val orderedVms = when (resourceSort) {
+        "name" -> filteredVms.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+        "cpu" -> filteredVms.sortedByDescending { it.cpu }
+        "memory" -> filteredVms.sortedByDescending { it.mem }
+        "vmid" -> filteredVms.sortedBy { it.vmid }
+        else -> filteredVms.sortedWith(compareBy({ it.node }, { it.vmid }))
     }
 
     LaunchedEffect(Unit) {
@@ -650,12 +659,27 @@ private fun Dashboard(
                     FilterChip(selected = resourceStatusFilter == "running", onClick = { resourceStatusFilter = "running" }, label = { Text("Pokrenute") })
                     FilterChip(selected = resourceStatusFilter == "stopped", onClick = { resourceStatusFilter = "stopped" }, label = { Text("Zaustavljene") })
                 }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Sortiranje", style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.width(8.dp))
+                    Box {
+                        TextButton(onClick = { sortMenuExpanded = true }) {
+                            Text(when (resourceSort) { "name" -> "Naziv"; "cpu" -> "Najveći CPU"; "memory" -> "Najviše RAM-a"; "vmid" -> "VMID"; else -> "Node / VMID" })
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                        }
+                        DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { sortMenuExpanded = false }) {
+                            listOf("node" to "Node / VMID", "name" to "Naziv", "vmid" to "VMID", "cpu" to "Najveći CPU", "memory" to "Najviše RAM-a").forEach { (value, label) ->
+                                DropdownMenuItem(text = { Text(label) }, onClick = { resourceSort = value; sortMenuExpanded = false })
+                            }
+                        }
+                    }
+                }
                 if (filteredVms.size != vms.size) Text("Prikazano ${filteredVms.size} od ${vms.size}", style = MaterialTheme.typography.bodySmall)
             }
             if (vmLoading && vms.isEmpty()) {
                 item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() } }
             }
-            items(filteredVms, key = { it.node + "-" + it.type + "-" + it.vmid }) { vm ->
+            items(orderedVms, key = { it.node + "-" + it.type + "-" + it.vmid }) { vm ->
                 VmCard(vm, vmLoading, onVmAction, onConsole, onSnapshot, onEditConfig = { selected ->
                     editVm = selected
                 }, onSnapshots = { selected ->
