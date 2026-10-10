@@ -1529,7 +1529,7 @@ private fun VmCard(
     var showSnapshot by remember { mutableStateOf(false) }
     var snapshotName by remember { mutableStateOf("") }
     var snapshotDescription by remember { mutableStateOf("") }
-    val vmCpuPercent = (vm.cpu * 100f).coerceIn(0f, 100f)
+    val vmCpuPercent = (vm.cpu * 100.0).toFloat().coerceIn(0f, 100f)
     val vmMemPercent = if (vm.maxMem > 0L) (vm.mem.toDouble() / vm.maxMem.toDouble() * 100.0).toFloat().coerceIn(0f, 100f) else 0f
     Card(
         Modifier.fillMaxWidth(),
