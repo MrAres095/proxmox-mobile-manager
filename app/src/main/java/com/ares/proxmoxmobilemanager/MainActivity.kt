@@ -1495,20 +1495,60 @@ private fun VmCard(
     var showSnapshot by remember { mutableStateOf(false) }
     var snapshotName by remember { mutableStateOf("") }
     var snapshotDescription by remember { mutableStateOf("") }
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(vm.name, style = MaterialTheme.typography.titleLarge)
-                    Text(vm.type.uppercase() + " • VMID " + vm.vmid + " • " + vm.node)
+    val vmCpuPercent = (vm.cpu * 100f).coerceIn(0f, 100f)
+    val vmMemPercent = if (vm.maxMem > 0L) (vm.mem.toDouble() / vm.maxMem.toDouble() * 100.0).toFloat().coerceIn(0f, 100f) else 0f
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color(0xFF10181D))
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    modifier = Modifier.size(42.dp),
+                    shape = MaterialTheme.shapes.large,
+                    color = if (vm.isRunning) androidx.compose.ui.graphics.Color(0xFF123A2B) else androidx.compose.ui.graphics.Color(0xFF263139)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(if (vm.isQemu) Icons.Default.DesktopWindows else Icons.Default.Terminal, contentDescription = null, tint = if (vm.isRunning) androidx.compose.ui.graphics.Color(0xFF65E6A2) else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
-                Text(vm.status)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(vm.name, style = MaterialTheme.typography.titleMedium)
+                    Text(vm.type.uppercase() + "  •  VMID " + vm.vmid + "  •  " + vm.node, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Surface(
+                    shape = CircleShape,
+                    color = if (vm.isRunning) androidx.compose.ui.graphics.Color(0xFF123A2B) else androidx.compose.ui.graphics.Color(0xFF263139)
+                ) {
+                    Text(
+                        if (vm.isRunning) "RUNNING" else vm.status.uppercase(),
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (vm.isRunning) androidx.compose.ui.graphics.Color(0xFF65E6A2) else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
-            Spacer(Modifier.height(8.dp))
-            Text("RAM: " + formatBytes(vm.mem) + " / " + formatBytes(vm.maxMem))
-            Text("CPU: " + "%.1f".format(vm.cpu * 100) + "%")
-            if (vm.maxDisk > 0) Text("Disk: " + formatBytes(vm.maxDisk))
-            Spacer(Modifier.height(12.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("CPU", style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.weight(1f))
+                    Text("${"%.1f".format(vmCpuPercent)}%", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                }
+                LinearProgressIndicator(progress = { vmCpuPercent / 100f }, modifier = Modifier.fillMaxWidth().height(6.dp), color = MaterialTheme.colorScheme.primary, trackColor = androidx.compose.ui.graphics.Color(0xFF293940))
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("RAM", style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.weight(1f))
+                    Text("${vmMemPercent.toInt()}%", style = MaterialTheme.typography.labelLarge, color = androidx.compose.ui.graphics.Color(0xFF35D07F))
+                }
+                LinearProgressIndicator(progress = { vmMemPercent / 100f }, modifier = Modifier.fillMaxWidth().height(6.dp), color = androidx.compose.ui.graphics.Color(0xFF35D07F), trackColor = androidx.compose.ui.graphics.Color(0xFF293940))
+                Text(formatBytes(vm.mem) + " / " + formatBytes(vm.maxMem), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (vm.maxDisk > 0) Text("Disk: " + formatBytes(vm.maxDisk), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(2.dp))
             OutlinedButton({ onConsole(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()){ Icon(Icons.Default.Terminal,null); Spacer(Modifier.width(4.dp)); Text("Console") }
             Spacer(Modifier.height(8.dp))
             OutlinedButton({ onDetails(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.Tune, null); Spacer(Modifier.width(4.dp)); Text("Detalji / konfiguracija") }
