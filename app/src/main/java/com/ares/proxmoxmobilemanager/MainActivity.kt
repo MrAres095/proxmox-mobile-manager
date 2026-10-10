@@ -1012,21 +1012,55 @@ private fun Dashboard(
             }
             items(filteredStorage, key = { it.node + "-" + it.storage }) { s ->
                 val usedPercent = if (s.total > 0L) ((s.used.toDouble() / s.total.toDouble()) * 100.0).toInt().coerceIn(0, 100) else 0
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                val storageColor = when {
+                    usedPercent >= 90 -> MaterialTheme.colorScheme.error
+                    usedPercent >= 75 -> androidx.compose.ui.graphics.Color(0xFFFFC857)
+                    else -> androidx.compose.ui.graphics.Color(0xFF35D07F)
+                }
+                Card(
+                    Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color(0xFF10181D))
+                ) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Storage, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(s.storage, style = MaterialTheme.typography.titleMedium)
+                            Surface(modifier = Modifier.size(38.dp), shape = MaterialTheme.shapes.medium, color = androidx.compose.ui.graphics.Color(0xFF17252B)) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.Storage, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(s.storage, style = MaterialTheme.typography.titleMedium)
+                                Text("${s.node} • ${s.type}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Surface(shape = CircleShape, color = if (s.active) androidx.compose.ui.graphics.Color(0xFF123A2B) else androidx.compose.ui.graphics.Color(0xFF263139)) {
+                                Text(if (s.active) "AKTIVNO" else "NEAKTIVNO", modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp), style = MaterialTheme.typography.labelSmall, color = if (s.active) androidx.compose.ui.graphics.Color(0xFF65E6A2) else MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
-                        Text("${s.node} • ${s.type} • ${if (s.active) "aktivno" else "neaktivno"}")
-                        Text("Iskorišteno: ${formatBytes(s.used)} / ${formatBytes(s.total)} ($usedPercent%)")
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Zauzeće", style = MaterialTheme.typography.labelLarge)
+                            Spacer(Modifier.weight(1f))
+                            Text("$usedPercent%", style = MaterialTheme.typography.titleMedium, color = storageColor)
+                        }
                         LinearProgressIndicator(
                             progress = { usedPercent / 100f },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().height(7.dp),
+                            color = storageColor,
+                            trackColor = androidx.compose.ui.graphics.Color(0xFF293940)
                         )
-                        Text("Slobodno: ${formatBytes(s.avail)}")
-                        if (s.content.isNotBlank()) Text("Sadržaj: ${s.content}", style = MaterialTheme.typography.bodySmall)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text("ISKORIŠTENO", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(formatBytes(s.used), style = MaterialTheme.typography.bodyMedium)
+                            }
+                            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text("UKUPNO", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(formatBytes(s.total), style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                        Text("Slobodno: ${formatBytes(s.avail)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (s.content.isNotBlank()) Text("Sadržaj: ${s.content}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
