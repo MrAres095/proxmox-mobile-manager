@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -86,7 +87,22 @@ fun ProxmoxApp() {
             val scope = rememberCoroutineScope()
 
             if (consoleVm != null && connectedBase != null) { ConsoleScreen(connectedBase!!, connection, consoleVm!!, { console.close(); consoleVm=null }) } else if (showSettings || connectedBase == null) {
-                ConnectionScreen(connection, loading, error, profiles, selectedProfile, onThemeSettings = { showUiSettings = true }) { profileName, newConnection ->
+                ConnectionScreen(
+                    connection, loading, error, profiles, selectedProfile,
+                    onThemeSettings = { showUiSettings = true },
+                    onSaveProfile = { profileName, newConnection ->
+                        selectedProfile = profileName
+                        connection = newConnection
+                        ProxmoxServerProfiles.save(context, ProxmoxServerProfile(profileName, newConnection))
+                        profiles = ProxmoxServerProfiles.load(context)
+                        prefs.edit().putString("localUrl", newConnection.localUrl).putString("remoteUrl", newConnection.remoteUrl).putString("username", newConnection.username).putString("password", newConnection.password).putString("tokenId", newConnection.tokenId).putString("tokenSecret", newConnection.tokenSecret).apply()
+                    },
+                    onDeleteProfile = { profileName ->
+                        ProxmoxServerProfiles.delete(context, profileName)
+                        profiles = ProxmoxServerProfiles.load(context)
+                        if (selectedProfile == profileName) selectedProfile = profiles.firstOrNull()?.name ?: "Novi server"
+                    }
+                ) { profileName, newConnection ->
                     selectedProfile = profileName
                     connection = newConnection
                     ProxmoxServerProfiles.save(context, ProxmoxServerProfile(profileName, newConnection))
@@ -272,146 +288,262 @@ private fun ConnectionScreen(
     profiles: List<ProxmoxServerProfile>,
     selectedProfile: String,
     onThemeSettings: () -> Unit = {},
+    onSaveProfile: (String, ProxmoxConnection) -> Unit,
+    onDeleteProfile: (String) -> Unit,
     onConnect: (String, ProxmoxConnection) -> Unit
 ) {
     var profileName by remember { mutableStateOf(selectedProfile) }
-    var profileMenu by remember { mutableStateOf(false) }
-    var local by remember { mutableStateOf(initial.localUrl.removePrefix("https://").removePrefix("http://").substringBefore(":8006")) }
-    var localPort by remember { mutableStateOf("8006") }
+    var local by remember { mutableStateOf(android.net.Uri.parse(if (initial.localUrl.contains("://")) initial.localUrl else "https://" + initial.localUrl).host.orEmpty()) }
+    var localPort by remember { mutableStateOf(android.net.Uri.parse(if (initial.localUrl.contains("://")) initial.localUrl else "https://" + initial.localUrl).port.takeIf { it > 0 }?.toString() ?: "8006") }
     var username by remember { mutableStateOf(initial.username) }
     var password by remember { mutableStateOf(initial.password) }
     var remote by remember { mutableStateOf(initial.remoteUrl) }
     var tokenId by remember { mutableStateOf(initial.tokenId) }
     var secret by remember { mutableStateOf(initial.tokenSecret) }
+    var remoteMode by remember { mutableStateOf(false) }
+    var deleteTarget by remember { mutableStateOf<String?>(null) }
+    var showPassword by remember { mutableStateOf(false) }
+
+    fun applyProfile(profile: ProxmoxServerProfile) {
+        profileName = profile.name
+        val parsed = android.net.Uri.parse(if (profile.connection.localUrl.contains("://")) profile.connection.localUrl else "https://" + profile.connection.localUrl)
+        local = parsed.host.orEmpty()
+        localPort = parsed.port.takeIf { it > 0 }?.toString() ?: "8006"
+        username = profile.connection.username
+        password = profile.connection.password
+        remote = profile.connection.remoteUrl
+        tokenId = profile.connection.tokenId
+        secret = profile.connection.tokenSecret
+        remoteMode = local.isBlank() && remote.isNotBlank()
+    }
+
+    fun buildConnection(): ProxmoxConnection {
+        val host = local.trim().removePrefix("https://").removePrefix("http://").trimEnd('/')
+        val endpoint = if (host.isBlank()) "" else "https://$host:${localPort.toIntOrNull()?.takeIf { it in 1..65535 } ?: 8006}"
+        return ProxmoxConnection(endpoint, remote.trim().trimEnd('/'), username.trim(), password, tokenId.trim(), secret.trim())
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)) {
-                            Icon(Icons.Default.Dns, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(8.dp).size(24.dp))
+                        Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)) {
+                            Icon(Icons.Default.Dns, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(9.dp).size(25.dp))
                         }
                         Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                            Text("Proxmox Mobile", style = MaterialTheme.typography.titleLarge)
-                            Text("SERVER CONTROL", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.5.sp)
+                            Text("Proxmox Mobile", style = MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                            Text("SERVER MANAGER", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.6.sp)
                         }
                     }
                 },
-                actions = { IconButton(onClick = onThemeSettings) { Icon(Icons.Default.Palette, null) } }
+                actions = { IconButton(onClick = onThemeSettings) { Icon(Icons.Default.Palette, contentDescription = "Izgled") } }
             )
         },
         bottomBar = {
-            Surface(
-                modifier = Modifier.navigationBarsPadding(),
-                shadowElevation = 8.dp
-            ) {
-                Button(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-                    enabled = !loading && (local.isNotBlank() || remote.isNotBlank()),
-                    onClick = {
-                        val endpoint = if (local.isBlank()) "" else "https://" + local.trim().removePrefix("https://").removePrefix("http://").trimEnd('/') + ":" + localPort.ifBlank { "8006" }
-                        onConnect(profileName.ifBlank { "Proxmox" }, ProxmoxConnection(endpoint, remote.trim().trimEnd('/'), username.trim(), password, tokenId.trim(), secret.trim()))
+            Surface(color = MaterialTheme.colorScheme.surface, shadowElevation = 12.dp, modifier = Modifier.navigationBarsPadding()) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(
+                        onClick = { if (profileName.isNotBlank() && (local.isNotBlank() || remote.isNotBlank())) onSaveProfile(profileName.trim(), buildConnection()) },
+                        enabled = !loading && profileName.isNotBlank() && (local.isNotBlank() || remote.isNotBlank()),
+                        modifier = Modifier.weight(0.9f).height(52.dp)
+                    ) {
+                        Icon(Icons.Default.Save, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Spremi")
                     }
-                ) {
-                    if (loading) CircularProgressIndicator(modifier = Modifier.height(20.dp))
-                    else {
-                        Icon(Icons.Default.Login, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Log in / Poveži se")
+                    Button(
+                        onClick = { onConnect(profileName.ifBlank { "Proxmox" }.trim(), buildConnection()) },
+                        enabled = !loading && (local.isNotBlank() || remote.isNotBlank()),
+                        modifier = Modifier.weight(1.3f).height(52.dp)
+                    ) {
+                        if (loading) CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        else {
+                            Icon(Icons.Default.Login, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Poveži se")
+                        }
                     }
                 }
             }
         }
     ) { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
+            modifier = Modifier.fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
                 .padding(padding)
-                .padding(horizontal = 16.dp, vertical = 14.dp)
-                .verticalScroll(androidx.compose.foundation.rememberScrollState()),
-            verticalArrangement = Arrangement.Top
+                .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Surface(
+            Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 3.dp
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Row(
-                    modifier = Modifier.padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                    ) {
-                        Icon(
-                            Icons.Default.Dns,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(14.dp).size(32.dp)
-                        )
+                Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)) {
+                        Icon(Icons.Default.Storage, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(14.dp).size(34.dp))
                     }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Sve pod kontrolom.", style = MaterialTheme.typography.headlineSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "Sigurno poveži svoj Proxmox i upravljaj nodeovima, virtualnim strojevima, pohranom i zadacima s mobitela.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Svi tvoji Proxmox serveri", style = MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                        Text("Dodaj koliko god servera želiš. Svaki ima vlastitu adresu i podatke za prijavu.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${profiles.size} spremljeno", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
-            Spacer(Modifier.height(18.dp))
-            Text("TVOJI SERVERI", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.6.sp)
-            Spacer(Modifier.height(8.dp))
-            ExposedDropdownMenuBox(expanded = profileMenu, onExpandedChange = { profileMenu = !profileMenu }) {
-                OutlinedTextField(profileName, {}, Modifier.fillMaxWidth().menuAnchor(), label = { Text("Profil servera") }, readOnly = true)
-                ExposedDropdownMenu(expanded = profileMenu, onDismissRequest = { profileMenu = false }) {
-                    profiles.forEach { p -> DropdownMenuItem(text = { Text(p.name) }, onClick = { profileName = p.name; local = p.connection.localUrl.removePrefix("https://").removePrefix("http://").substringBefore(":8006"); username = p.connection.username; password = p.connection.password; remote = p.connection.remoteUrl; tokenId = p.connection.tokenId; secret = p.connection.tokenSecret; profileMenu = false }) }
-                    DropdownMenuItem(text = { Text("+ Novi server") }, onClick = { profileName = "Proxmox ${profiles.size + 1}"; profileMenu = false })
-                }
-            }
-            Spacer(Modifier.height(6.dp))
-            Text("Spremi više Proxmox servera i brzo se prebacuj između njih.", style = MaterialTheme.typography.bodySmall)
-            Spacer(Modifier.height(8.dp))
-            Text("BRZI SAVJET", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.3.sp)
-            Spacer(Modifier.height(5.dp))
-            Text("Lokalno: IP adresa, korisničko ime i lozinka. Udaljeno: domena i API token. Lozinka i token ostaju spremljeni u profilu na ovom uređaju.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(20.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Default.Wifi, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Text("Lokalna mreža", style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
-            }
-            Spacer(Modifier.height(6.dp))
-            OutlinedTextField(local, { local = it }, Modifier.fillMaxWidth(), label = { Text("IP adresa") }, placeholder = { Text("npr. 192.168.1.37") }, singleLine = true)
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextField(localPort, { localPort = it.filter(Char::isDigit).take(5) }, Modifier.fillMaxWidth(), label = { Text("Port") }, placeholder = { Text("8006") }, singleLine = true)
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextField(username, { username = it }, Modifier.fillMaxWidth(), label = { Text("Korisničko ime") }, placeholder = { Text("root@pam") }, singleLine = true)
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextField(password, { password = it }, Modifier.fillMaxWidth(), label = { Text("Lozinka") }, singleLine = true, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
-            Spacer(Modifier.height(18.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(14.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Default.Public, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Text("Udaljeni pristup", style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
-            }
-            Spacer(Modifier.height(6.dp))
-            OutlinedTextField(remote, { remote = it }, Modifier.fillMaxWidth(), label = { Text("Domena / javna IP") }, placeholder = { Text("https://proxmox.mojadomena.hr:8006") }, singleLine = true)
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextField(tokenId, { tokenId = it }, Modifier.fillMaxWidth(), label = { Text("API token ID") }, placeholder = { Text("root@pam!mobile") }, singleLine = true)
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextField(secret, { secret = it }, Modifier.fillMaxWidth(), label = { Text("API token secret") }, singleLine = true, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
-            Spacer(Modifier.height(18.dp))
-            if (error != null) { Text(error, color = MaterialTheme.colorScheme.error); Spacer(Modifier.height(12.dp)) }
 
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("MOJI SERVERI", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.5.sp)
+                    Text("Dodirni spremljeni server za uređivanje ili povezivanje.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                FilledTonalButton(onClick = {
+                    profileName = "Server ${profiles.size + 1}"
+                    local = ""; localPort = "8006"; username = "root@pam"; password = ""
+                    remote = ""; tokenId = ""; secret = ""; remoteMode = false
+                }) {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                    Spacer(Modifier.width(4.dp))
+                    Text("Dodaj")
+                }
+            }
+
+            if (profiles.isEmpty()) {
+                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Text("Još nema spremljenih profila. Unesi podatke ispod i pritisni Spremi ili Poveži se.")
+                    }
+                }
+            } else {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    profiles.forEach { profile ->
+                        val active = profile.name == profileName
+                        Card(
+                            modifier = Modifier.width(190.dp).clickable { applyProfile(profile) },
+                            shape = MaterialTheme.shapes.large,
+                            border = if (active) androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                            colors = CardDefaults.cardColors(containerColor = if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f) else MaterialTheme.colorScheme.surface)
+                        ) {
+                            Row(Modifier.padding(start = 12.dp, end = 4.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Dns, contentDescription = null, tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.width(8.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(profile.name, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                                    Text(
+                                        profile.connection.localUrl.ifBlank { profile.connection.remoteUrl }.removePrefix("https://").removePrefix("http://").take(24),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1
+                                    )
+                                }
+                                IconButton(onClick = { deleteTarget = profile.name }, modifier = Modifier.size(34.dp)) {
+                                    Icon(Icons.Default.Close, contentDescription = "Ukloni ${profile.name}", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)) {
+                            Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(9.dp).size(22.dp))
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text("Postavke veze", style = MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                            Text("Naziv profila i pristupni podaci", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    OutlinedTextField(
+                        value = profileName, onValueChange = { profileName = it }, modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Naziv servera") }, placeholder = { Text("npr. Kućni Proxmox") }, singleLine = true
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = !remoteMode, onClick = { remoteMode = false }, label = { Text("Lokalna mreža") }, leadingIcon = { Icon(Icons.Default.Wifi, null) })
+                        FilterChip(selected = remoteMode, onClick = { remoteMode = true }, label = { Text("Udaljeni pristup") }, leadingIcon = { Icon(Icons.Default.Public, null) })
+                    }
+                    if (!remoteMode) {
+                        OutlinedTextField(
+                            value = local, onValueChange = { local = it }, modifier = Modifier.fillMaxWidth(),
+                            label = { Text("IP adresa ili hostname") }, placeholder = { Text("192.168.1.37") }, singleLine = true,
+                            leadingIcon = { Icon(Icons.Default.Router, contentDescription = null) }
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
+                            OutlinedTextField(
+                                value = localPort, onValueChange = { localPort = it.filter(Char::isDigit).take(5) },
+                                modifier = Modifier.weight(0.65f), label = { Text("Port") }, placeholder = { Text("8006") }, singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = username, onValueChange = { username = it }, modifier = Modifier.weight(1.35f),
+                                label = { Text("Korisničko ime") }, placeholder = { Text("root@pam") }, singleLine = true
+                            )
+                        }
+                        OutlinedTextField(
+                            value = password, onValueChange = { password = it }, modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Lozinka") }, singleLine = true,
+                            visualTransformation = if (showPassword) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            trailingIcon = { IconButton(onClick = { showPassword = !showPassword }) { Icon(if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility, contentDescription = "Prikaži ili sakrij lozinku") } }
+                        )
+                        Text("Za lokalni pristup unesi IP adresu svog Proxmox noda, port (obično 8006), korisnika i lozinku.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        OutlinedTextField(
+                            value = remote, onValueChange = { remote = it }, modifier = Modifier.fillMaxWidth(),
+                            label = { Text("HTTPS adresa / domena") }, placeholder = { Text("https://pve.mojadomena.hr:8006") }, singleLine = true,
+                            leadingIcon = { Icon(Icons.Default.Language, contentDescription = null) }
+                        )
+                        OutlinedTextField(value = tokenId, onValueChange = { tokenId = it }, modifier = Modifier.fillMaxWidth(), label = { Text("API token ID") }, placeholder = { Text("root@pam!mobile") }, singleLine = true)
+                        OutlinedTextField(
+                            value = secret, onValueChange = { secret = it }, modifier = Modifier.fillMaxWidth(),
+                            label = { Text("API token secret") }, singleLine = true,
+                            visualTransformation = if (showPassword) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            trailingIcon = { IconButton(onClick = { showPassword = !showPassword }) { Icon(if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility, contentDescription = "Prikaži ili sakrij token") } }
+                        )
+                        Text("Za udaljeni pristup koristi HTTPS i API token s ograničenim dozvolama. Nemoj izlagati Proxmox sučelje javno bez odgovarajuće zaštite.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            if (error != null) {
+                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                        Text(error, color = MaterialTheme.colorScheme.onErrorContainer)
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
         }
+    }
+
+    if (deleteTarget != null) {
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text("Ukloniti spremljeni server?") },
+            text = { Text("Profil \"${deleteTarget}\" bit će uklonjen samo iz aplikacije. Proxmox server i njegovi podaci neće biti obrisani.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val name = deleteTarget!!
+                    onDeleteProfile(name)
+                    if (profileName == name) {
+                        profileName = "Novi server"
+                        local = ""; localPort = "8006"; username = "root@pam"; password = ""
+                        remote = ""; tokenId = ""; secret = ""; remoteMode = false
+                    }
+                    deleteTarget = null
+                }) { Text("Ukloni", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("Odustani") } }
+        )
     }
 }
 @OptIn(ExperimentalMaterial3Api::class)
