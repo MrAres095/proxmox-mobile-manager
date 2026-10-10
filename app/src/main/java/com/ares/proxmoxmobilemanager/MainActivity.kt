@@ -881,7 +881,7 @@ private fun Dashboard(
                 }
             }
             items(nodes) { node ->
-                val nodeCpu = (node.cpu * 100f).coerceIn(0f, 100f)
+                val nodeCpu = (node.cpu * 100.0).toFloat().coerceIn(0f, 100f)
                 val nodeMem = if (node.maxMem > 0L) (node.mem.toDouble() / node.maxMem.toDouble() * 100.0).toFloat().coerceIn(0f, 100f) else 0f
                 val nodeOnline = node.status.equals("online", ignoreCase = true)
                 val uptimeDays = node.uptime / 86400L
