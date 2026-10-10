@@ -299,6 +299,27 @@ class ProxmoxApi {
             }
         }
 
+    suspend fun getNodeNetwork(base: String, connection: ProxmoxConnection, node: ProxmoxNode): List<String> =
+        withContext(Dispatchers.IO) {
+            val path = "/api2/json/nodes/${URLEncoder.encode(node.node, "UTF-8")}/network"
+            val data = request(base, path, connection, 10000).optJSONArray("data")
+                ?: return@withContext emptyList()
+            buildList {
+                for (i in 0 until data.length()) {
+                    val item = data.optJSONObject(i) ?: continue
+                    val iface = item.optString("iface", "nepoznato")
+                    val type = item.optString("type", "interface")
+                    val active = if (item.optBoolean("active", false)) "aktivno" else "neaktivno"
+                    val autostart = if (item.optBoolean("autostart", false)) "autostart" else "bez autostarta"
+                    val address = listOf(item.optString("address"), item.optString("netmask"))
+                        .filter { it.isNotBlank() }.joinToString("/")
+                    val bridge = item.optString("bridge_ports").takeIf { it.isNotBlank() }?.let { " • portovi: $it" }.orEmpty()
+                    add("$iface • $type • $active • $autostart" +
+                        (if (address.isNotBlank()) " • $address" else "") + bridge)
+                }
+            }.sorted()
+        }
+
     suspend fun controlNode(base: String, connection: ProxmoxConnection, node: ProxmoxNode, action: String) {
         require(action == "reboot" || action == "shutdown") { "Nepoznata radnja za node." }
         post(base, "/api2/json/nodes/${URLEncoder.encode(node.node, "UTF-8")}/status", connection, 10000, "command=" + URLEncoder.encode(action, "UTF-8"))
