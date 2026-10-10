@@ -136,6 +136,10 @@ class ProxmoxApi {
     private var localTicket: String? = null
     private var localCsrf: String? = null
     private var localUser: String? = null
+    private var remoteTicket: String? = null
+    private var remoteCsrf: String? = null
+    private var remoteUser: String? = null
+    private var remoteBase: String? = null
 
     private suspend fun ensureLocalLogin(base: String, connection: ProxmoxConnection) {
         if (base != connection.localUrl.trim().trimEnd('/')) return
@@ -163,17 +167,52 @@ class ProxmoxApi {
         }
     }
 
+    private suspend fun ensureRemoteConsoleLogin(base: String, connection: ProxmoxConnection) {
+        val loginUser = connection.username.trim().let { if (it.contains("@")) it else "$it@pam" }
+        if (connection.username.isBlank() || connection.password.isBlank()) return
+        if (remoteTicket != null && remoteUser == loginUser && remoteBase == base.trimEnd('/')) return
+        withContext(Dispatchers.IO) {
+            val url = URL(base.trimEnd('/') + "/api2/json/access/ticket")
+            val conn = openConnection(url, base, connection).apply {
+                connectTimeout = 7000; readTimeout = 10000; requestMethod = "POST"; doOutput = true
+                setRequestProperty("Accept", "application/json")
+                setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+            }
+            try {
+                val form = "username=" + URLEncoder.encode(loginUser, "UTF-8") + "&password=" + URLEncoder.encode(connection.password, "UTF-8")
+                conn.outputStream.use { it.write(form.toByteArray(Charsets.UTF_8)) }
+                val code = conn.responseCode
+                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+                val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                if (code !in 200..299) throw IllegalStateException(if (code == 401) "Udaljena prijava nije uspjela: provjeri korisničko ime i lozinku." else "Proxmox udaljena prijava HTTP $code: $body")
+                val data = JSONObject(body).getJSONObject("data")
+                remoteTicket = data.getString("ticket")
+                remoteCsrf = data.optString("CSRFPreventionToken").ifBlank { null }
+                remoteUser = loginUser
+                remoteBase = base.trimEnd('/')
+            } finally { conn.disconnect() }
+        }
+    }
+
     suspend fun getConsoleAuthHeaders(base: String, connection: ProxmoxConnection): Map<String, String> {
         ensureLocalLogin(base, connection)
-        return if (base == connection.localUrl.trim().trimEnd('/') && localTicket != null) {
-            buildMap {
+        if (base == connection.localUrl.trim().trimEnd('/') && localTicket != null) {
+            return buildMap {
                 put("Cookie", "PVEAuthCookie=" + localTicket)
                 localCsrf?.let { put("CSRFPreventionToken", it) }
             }
-        } else {
-            if (connection.tokenId.isBlank() || connection.tokenSecret.isBlank()) throw IllegalStateException("Za udaljeni pristup upiši API token ID i Secret.")
-            mapOf("Authorization" to "PVEAPIToken=" + connection.tokenId + "=" + connection.tokenSecret)
         }
+        if (connection.username.isNotBlank() && connection.password.isNotBlank()) {
+            ensureRemoteConsoleLogin(base, connection)
+            if (remoteTicket != null && remoteBase == base.trimEnd('/')) {
+                return buildMap {
+                    put("Cookie", "PVEAuthCookie=" + remoteTicket)
+                    remoteCsrf?.let { put("CSRFPreventionToken", it) }
+                }
+            }
+        }
+        if (connection.tokenId.isBlank() || connection.tokenSecret.isBlank()) throw IllegalStateException("Za udaljenu konzolu upiši korisničko ime i lozinku ili API token ID i Secret.")
+        return mapOf("Authorization" to "PVEAPIToken=" + connection.tokenId + "=" + connection.tokenSecret)
     }
 
     private fun applyAuth(conn: HttpURLConnection, base: String, connection: ProxmoxConnection) {
