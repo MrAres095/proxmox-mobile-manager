@@ -4,6 +4,8 @@ import android.os.Bundle
 import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.*
@@ -555,10 +557,15 @@ private fun Dashboard(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Proxmox") },
+                title = {
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text("Proxmox Manager", style = MaterialTheme.typography.titleLarge)
+                        Text(base, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    }
+                },
                 actions = {
-                    IconButton(onClick = onRefresh) { Icon(Icons.Default.Refresh, null) }
-                    IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, null) }
+                    IconButton(onClick = onRefresh, enabled = !loading && !vmLoading) { Icon(Icons.Default.Refresh, contentDescription = "Osvježi") }
+                    IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, contentDescription = "Postavke") }
                 }
             )
         }
@@ -569,27 +576,66 @@ private fun Dashboard(
         ) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("OVERVIEW", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color(0xFF10181D))) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("PREGLED SUSTAVA", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.weight(1f))
+                        if (loading || vmLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Osvježavanje", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Card(
+                        Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.extraLarge,
+                        colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color(0xFF10181D))
+                    ) {
+                        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text("Proxmox VE", style = MaterialTheme.typography.titleLarge)
-                                    Text(base, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Surface(
+                                    modifier = Modifier.size(46.dp),
+                                    shape = MaterialTheme.shapes.large,
+                                    color = androidx.compose.ui.graphics.Color(0xFF17343B)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Dns, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(25.dp))
+                                    }
                                 }
-                                IconButton(onClick = onRefresh) { Icon(Icons.Default.Refresh, contentDescription = "Osvježi") }
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text("Proxmox VE", style = MaterialTheme.typography.titleLarge)
+                                    Text("Povezani sustav", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Surface(
+                                    shape = MaterialTheme.shapes.small,
+                                    color = androidx.compose.ui.graphics.Color(0xFF123A2B)
+                                ) {
+                                    Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Box(Modifier.size(7.dp).background(androidx.compose.ui.graphics.Color(0xFF35D07F), CircleShape))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("API", style = MaterialTheme.typography.labelMedium, color = androidx.compose.ui.graphics.Color(0xFF65E6A2))
+                                    }
+                                }
                             }
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Surface(Modifier.weight(1f), color = androidx.compose.ui.graphics.Color(0xFF17252B), shape = MaterialTheme.shapes.medium) {
-                                    Column(Modifier.padding(12.dp)) {
-                                        Text("NODEOVI", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Surface(Modifier.weight(1f), color = androidx.compose.ui.graphics.Color(0xFF17252B), shape = MaterialTheme.shapes.large) {
+                                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.Dns, contentDescription = null, tint = androidx.compose.ui.graphics.Color(0xFF35D07F), modifier = Modifier.size(16.dp))
+                                            Spacer(Modifier.width(5.dp))
+                                            Text("NODEOVI", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
                                         Text("${nodes.count { it.status.equals("online", true) }} / ${nodes.size}", style = MaterialTheme.typography.headlineMedium, color = androidx.compose.ui.graphics.Color(0xFF35D07F))
                                         Text("online", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                 }
-                                Surface(Modifier.weight(1f), color = androidx.compose.ui.graphics.Color(0xFF17252B), shape = MaterialTheme.shapes.medium) {
-                                    Column(Modifier.padding(12.dp)) {
-                                        Text("VM / LXC", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Surface(Modifier.weight(1f), color = androidx.compose.ui.graphics.Color(0xFF17252B), shape = MaterialTheme.shapes.large) {
+                                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.Dns, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                            Spacer(Modifier.width(5.dp))
+                                            Text("VM / LXC", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
                                         Text("${vms.count { it.status.equals("running", true) }} / ${vms.size}", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
                                         Text("pokrenuto / ukupno", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
@@ -715,7 +761,15 @@ private fun Dashboard(
             }
             item { Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { Text("Replication", style = MaterialTheme.typography.titleLarge); Spacer(Modifier.height(6.dp)); Text("Pregled Proxmox replication jobova između nodeova."); Spacer(Modifier.height(10.dp)); Button(onClick = onReplication, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Sync, contentDescription = null); Spacer(Modifier.width(6.dp)); Text("Otvori Replication") } } } }
             item {
-                Text("Virtualne mašine i LXC", style = MaterialTheme.typography.headlineSmall)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("RESURSI", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                        Text("Virtualne mašine i LXC", style = MaterialTheme.typography.headlineSmall)
+                    }
+                    Surface(shape = CircleShape, color = androidx.compose.ui.graphics.Color(0xFF17343B)) {
+                        Text("${vms.size}", modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
+                    }
+                }
                 Spacer(Modifier.height(4.dp))
                 OutlinedTextField(
                     value = resourceQuery,
@@ -860,7 +914,10 @@ private fun Dashboard(
             }
             if (!loading && nodes.isEmpty()) item { Text("Nema pronađenih nodeova.") }
             item {
-                Text("Storage", style = MaterialTheme.typography.headlineSmall)
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("POHRANA", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Text("Storage", style = MaterialTheme.typography.headlineSmall)
+                }
                 OutlinedTextField(
                     value = storageQuery,
                     onValueChange = { storageQuery = it },
