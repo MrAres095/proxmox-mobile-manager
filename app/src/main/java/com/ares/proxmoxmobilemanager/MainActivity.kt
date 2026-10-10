@@ -37,7 +37,7 @@ fun ProxmoxApp() {
     val context = LocalContext.current
     val uiPrefs = remember { context.getSharedPreferences("ui_preferences", Context.MODE_PRIVATE) }
     var theme by remember { mutableStateOf(uiPrefs.getString("theme", "system") ?: "system") }
-    val dark = when (theme) { "dark" -> true; "light" -> false; else -> isSystemInDarkTheme() }
+    val dark = theme != "light"
     val appColors = if (dark) darkColorScheme(
         primary = androidx.compose.ui.graphics.Color(0xFF18C6D8),
         onPrimary = androidx.compose.ui.graphics.Color(0xFF00191D),
@@ -568,8 +568,52 @@ private fun Dashboard(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Text(base, style = MaterialTheme.typography.labelMedium)
-                if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("OVERVIEW", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color(0xFF10181D))) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("Proxmox VE", style = MaterialTheme.typography.titleLarge)
+                                    Text(base, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                IconButton(onClick = onRefresh) { Icon(Icons.Default.Refresh, contentDescription = "Osvježi") }
+                            }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Surface(Modifier.weight(1f), color = androidx.compose.ui.graphics.Color(0xFF17252B), shape = MaterialTheme.shapes.medium) {
+                                    Column(Modifier.padding(12.dp)) {
+                                        Text("NODEOVI", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text("${nodes.count { it.status.equals("online", true) }} / ${nodes.size}", style = MaterialTheme.typography.headlineMedium, color = androidx.compose.ui.graphics.Color(0xFF35D07F))
+                                        Text("online", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                                Surface(Modifier.weight(1f), color = androidx.compose.ui.graphics.Color(0xFF17252B), shape = MaterialTheme.shapes.medium) {
+                                    Column(Modifier.padding(12.dp)) {
+                                        Text("VM / LXC", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text("${vms.count { it.status.equals("running", true) }} / ${vms.size}", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+                                        Text("pokrenuto / ukupno", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                            val cpuUsage = if (nodes.isEmpty()) 0f else nodes.filter { it.status.equals("online", true) }.map { (it.cpu * 100.0).toFloat() }.average().toFloat().coerceIn(0f, 100f)
+                            val totalMem = nodes.filter { it.status.equals("online", true) }.sumOf { it.mem }
+                            val maxMem = nodes.filter { it.status.equals("online", true) }.sumOf { it.maxMem }
+                            val memUsage = if (maxMem > 0L) (totalMem.toDouble() / maxMem.toDouble() * 100.0).toFloat().coerceIn(0f, 100f) else 0f
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Column(Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) { Text("CPU", style = MaterialTheme.typography.titleSmall); Spacer(Modifier.weight(1f)); Text("${cpuUsage.toInt()}%", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium) }
+                                    LinearProgressIndicator(progress = { cpuUsage / 100f }, modifier = Modifier.fillMaxWidth().height(6.dp), color = MaterialTheme.colorScheme.primary, trackColor = androidx.compose.ui.graphics.Color(0xFF293940))
+                                }
+                                Column(Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) { Text("RAM", style = MaterialTheme.typography.titleSmall); Spacer(Modifier.weight(1f)); Text("${memUsage.toInt()}%", color = androidx.compose.ui.graphics.Color(0xFF35D07F), style = MaterialTheme.typography.titleMedium) }
+                                    LinearProgressIndicator(progress = { memUsage / 100f }, modifier = Modifier.fillMaxWidth().height(6.dp), color = androidx.compose.ui.graphics.Color(0xFF35D07F), trackColor = androidx.compose.ui.graphics.Color(0xFF293940))
+                                    Text("${formatBytes(totalMem)} / ${formatBytes(maxMem)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
             }
 
             if (update != null) {
