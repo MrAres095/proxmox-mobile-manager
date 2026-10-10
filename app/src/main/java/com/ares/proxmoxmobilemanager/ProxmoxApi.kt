@@ -711,6 +711,15 @@ class ProxmoxApi {
         }
     }
 
+    suspend fun deleteGuest(base: String, connection: ProxmoxConnection, vm: ProxmoxVm) {
+        withContext(Dispatchers.IO) {
+            require(!vm.isRunning) { "Prije brisanja zaustavi VM/LXC." }
+            val endpoint = if (vm.isQemu) "qemu" else "lxc"
+            val path = "/api2/json/nodes/${URLEncoder.encode(vm.node, "UTF-8")}/$endpoint/${vm.vmid}"
+            runTaskAndWait(base, connection, vm.node, requestWrite(base, path, connection, "DELETE", 15000))
+        }
+    }
+
     suspend fun backupVm(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, storage: String? = null) {
         withContext(Dispatchers.IO) {
             val endpoint = if (vm.isQemu) "qemu" else "lxc"
