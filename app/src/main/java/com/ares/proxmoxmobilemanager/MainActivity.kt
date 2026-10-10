@@ -881,16 +881,66 @@ private fun Dashboard(
                 }
             }
             items(nodes) { node ->
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text(node.node, style = MaterialTheme.typography.titleLarge)
-                        Text("Status: ${node.status}")
-                        Text("CPU: ${"%.1f".format(node.cpu * 100)}% / ${node.maxCpu} CPU")
-                        Text("RAM: ${formatBytes(node.mem)} / ${formatBytes(node.maxMem)}")
-                        Text("Uptime: ${node.uptime}s")
-                        Spacer(Modifier.height(8.dp))
-                        Button(onClick = { onNodeOpen(node) }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Dns, null); Spacer(Modifier.width(4.dp)); Text("Upravljaj serverom") }
-                        Spacer(Modifier.height(8.dp))
+                val nodeCpu = (node.cpu * 100f).coerceIn(0f, 100f)
+                val nodeMem = if (node.maxMem > 0L) (node.mem.toDouble() / node.maxMem.toDouble() * 100.0).toFloat().coerceIn(0f, 100f) else 0f
+                val nodeOnline = node.status.equals("online", ignoreCase = true)
+                val uptimeDays = node.uptime / 86400L
+                val uptimeHours = (node.uptime % 86400L) / 3600L
+                val uptimeMinutes = (node.uptime % 3600L) / 60L
+                Card(
+                    Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color(0xFF10181D))
+                ) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                modifier = Modifier.size(42.dp),
+                                shape = MaterialTheme.shapes.large,
+                                color = if (nodeOnline) androidx.compose.ui.graphics.Color(0xFF123A2B) else androidx.compose.ui.graphics.Color(0xFF3A2424)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.Dns, contentDescription = null, tint = if (nodeOnline) androidx.compose.ui.graphics.Color(0xFF65E6A2) else MaterialTheme.colorScheme.error)
+                                }
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(node.node, style = MaterialTheme.typography.titleMedium)
+                                Text("Uptime: ${uptimeDays}d ${uptimeHours}h ${uptimeMinutes}m", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Surface(
+                                shape = CircleShape,
+                                color = if (nodeOnline) androidx.compose.ui.graphics.Color(0xFF123A2B) else androidx.compose.ui.graphics.Color(0xFF3A2424)
+                            ) {
+                                Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Box(Modifier.size(7.dp).background(if (nodeOnline) androidx.compose.ui.graphics.Color(0xFF35D07F) else MaterialTheme.colorScheme.error, CircleShape))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(if (nodeOnline) "ONLINE" else node.status.uppercase(), style = MaterialTheme.typography.labelSmall, color = if (nodeOnline) androidx.compose.ui.graphics.Color(0xFF65E6A2) else MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("CPU", style = MaterialTheme.typography.labelLarge)
+                                Spacer(Modifier.weight(1f))
+                                Text("${"%.1f".format(nodeCpu)}%  •  ${node.maxCpu} vCPU", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                            }
+                            LinearProgressIndicator(progress = { nodeCpu / 100f }, modifier = Modifier.fillMaxWidth().height(7.dp), color = MaterialTheme.colorScheme.primary, trackColor = androidx.compose.ui.graphics.Color(0xFF293940))
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("RAM", style = MaterialTheme.typography.labelLarge)
+                                Spacer(Modifier.weight(1f))
+                                Text("${nodeMem.toInt()}%", style = MaterialTheme.typography.labelLarge, color = androidx.compose.ui.graphics.Color(0xFF35D07F))
+                            }
+                            LinearProgressIndicator(progress = { nodeMem / 100f }, modifier = Modifier.fillMaxWidth().height(7.dp), color = androidx.compose.ui.graphics.Color(0xFF35D07F), trackColor = androidx.compose.ui.graphics.Color(0xFF293940))
+                            Text("${formatBytes(node.mem)} / ${formatBytes(node.maxMem)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Button(onClick = { onNodeOpen(node) }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Default.Dns, null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Upravljaj serverom")
+                        }
                         OutlinedButton(
                             onClick = {
                                 nodeTasksNode = node.node
@@ -906,8 +956,8 @@ private fun Dashboard(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(Icons.Default.History, null)
-                            Spacer(Modifier.width(4.dp))
-                            Text("Povijest zadataka")
+                            Spacer(Modifier.width(6.dp))
+                            Text(if (nodeTasksLoading && nodeTasksNode == node.node) "Učitavam zadatke..." else "Povijest zadataka")
                         }
                     }
                 }
