@@ -1804,39 +1804,34 @@ private fun VmCard(
             }
             if (vm.maxDisk > 0) Text("Disk: " + formatBytes(vm.maxDisk), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(2.dp))
-            OutlinedButton({ onConsole(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()){ Icon(Icons.Default.Terminal,null); Spacer(Modifier.width(4.dp)); Text("Console") }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton({ onDetails(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.Tune, null); Spacer(Modifier.width(4.dp)); Text("Detalji / konfiguracija") }
-            Spacer(Modifier.height(6.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton({ onConsole(vm) }, enabled = !busy, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Terminal, null); Spacer(Modifier.width(4.dp)); Text("Konzola") }
+                OutlinedButton({ onDetails(vm) }, enabled = !busy, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Tune, null); Spacer(Modifier.width(4.dp)); Text("Konfiguracija") }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton({ onEditConfig(vm) }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Uredi") }
+                OutlinedButton({ onSnapshots(vm) }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Snapshoti") }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton({ onBackup(vm) }, enabled = !busy, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Backup, null); Spacer(Modifier.width(4.dp)); Text("Backup") }
+                OutlinedButton({ onFirewall(vm) }, enabled = !busy, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Security, null); Spacer(Modifier.width(4.dp)); Text("Firewall") }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton({ onClone(vm) }, enabled = !busy && vm.isQemu, modifier = Modifier.weight(1f)) { Icon(Icons.Default.ContentCopy, null); Spacer(Modifier.width(4.dp)); Text("Kloniraj") }
+                OutlinedButton({ onMigrate(vm) }, enabled = !busy, modifier = Modifier.weight(1f)) { Icon(Icons.Default.SwapHoriz, null); Spacer(Modifier.width(4.dp)); Text("Migriraj") }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    { showSnapshot = true; snapshotName = ""; snapshotDescription = "" },
+                    enabled = !busy, modifier = Modifier.weight(1f)
+                ) { Icon(Icons.Default.CameraAlt, null); Spacer(Modifier.width(4.dp)); Text("Novi snapshot") }
+                OutlinedButton({ onTasks(vm) }, enabled = !busy, modifier = Modifier.weight(1f)) { Icon(Icons.Default.History, null); Spacer(Modifier.width(4.dp)); Text("Zadaci") }
+            }
             OutlinedButton({ onDelete(vm) }, enabled = !busy && !vm.isRunning, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
                 Icon(Icons.Default.DeleteForever, null)
                 Spacer(Modifier.width(4.dp))
                 Text(if (vm.isRunning) "Zaustavi prije brisanja" else "Trajno obriši VM / LXC")
             }
-            Spacer(Modifier.height(6.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                OutlinedButton({ onEditConfig(vm) }, enabled=!busy, modifier=Modifier.weight(1f)) { Text("Uredi") }
-                OutlinedButton({ onSnapshots(vm) }, enabled=!busy, modifier=Modifier.weight(1f)) { Text("Snapshoti") }
-            }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton({ onBackup(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.Backup, null); Spacer(Modifier.width(4.dp)); Text("Backup") }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton({ onFirewall(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.Security, null); Spacer(Modifier.width(4.dp)); Text("Firewall") }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton({ onClone(vm) }, enabled=!busy && vm.isQemu, modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.ContentCopy, null); Spacer(Modifier.width(4.dp)); Text("Kloniraj QEMU VM") }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton({ onMigrate(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.SwapHoriz, null); Spacer(Modifier.width(4.dp)); Text("Migriraj na drugi node") }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                { showSnapshot = true; snapshotName = ""; snapshotDescription = "" },
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Default.CameraAlt, null)
-                Spacer(Modifier.width(4.dp))
-                Text("Napravi snapshot")
-            }
-            Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (vm.isRunning) {
                     OutlinedButton({ confirmAction = VmAction.REBOOT }, enabled = !busy, modifier = Modifier.weight(1f)) {
