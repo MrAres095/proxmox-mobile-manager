@@ -468,6 +468,73 @@ class ProxmoxApi {
         postAction(base, connection, vm, "reset")
     }
 
+    /**
+     * Creates a real guest through the Proxmox API and waits for the task to finish.
+     * QEMU guests are created with an empty boot disk; attach an ISO before first boot.
+     * LXC guests require an existing template such as local:vztmpl/debian-12-standard_*.tar.zst.
+     */
+    suspend fun createGuest(
+        base: String,
+        connection: ProxmoxConnection,
+        node: String,
+        kind: String,
+        vmid: Int,
+        name: String,
+        cores: Int,
+        memoryMb: Int,
+        diskGb: Int,
+        storage: String,
+        bridge: String,
+        template: String = "",
+        rootPassword: String = ""
+    ) {
+        withContext(Dispatchers.IO) {
+            require(vmid in 100..999999999) { "VMID mora biti između 100 i 999999999." }
+            require(name.isNotBlank()) { "Upiši naziv VM-a ili LXC-a." }
+            require(cores in 1..256) { "Broj jezgri mora biti između 1 i 256." }
+            require(memoryMb in 128..1048576) { "RAM mora biti između 128 i 1048576 MB." }
+            require(diskGb in 1..65536) { "Disk mora biti između 1 i 65536 GB." }
+            require(storage.isNotBlank()) { "Odaberi storage za disk." }
+            require(bridge.isNotBlank()) { "Upiši mrežni bridge, npr. vmbr0." }
+            val isLxc = kind.equals("lxc", ignoreCase = true)
+            if (isLxc) {
+                require(template.isNotBlank()) { "Za LXC upiši postojeći template, npr. local:vztmpl/debian-12-standard_*.tar.zst." }
+                require(rootPassword.length >= 8) { "Lozinka za root u LXC-u mora imati najmanje 8 znakova." }
+            }
+            val fields = linkedMapOf<String, String>()
+            fields["vmid"] = vmid.toString()
+            fields[if (isLxc) "hostname" else "name"] = name.trim()
+            fields["cores"] = cores.toString()
+            fields["memory"] = memoryMb.toString()
+            if (isLxc) {
+                fields["swap"] = "512"
+                fields["rootfs"] = "$storage:$diskGb"
+                fields["net0"] = "name=eth0,bridge=$bridge,ip=dhcp"
+                fields["ostemplate"] = template.trim()
+                fields["password"] = rootPassword
+                fields["unprivileged"] = "1"
+                fields["ostype"] = "debian"
+            } else {
+                fields["scsihw"] = "virtio-scsi-pci"
+                fields["scsi0"] = "$storage:$diskGb"
+                fields["net0"] = "virtio,bridge=$bridge"
+                fields["ostype"] = "l26"
+            }
+            val form = fields.entries.joinToString("&") { (key, value) ->
+                URLEncoder.encode(key, "UTF-8") + "=" + URLEncoder.encode(value, "UTF-8")
+            }
+            val endpoint = if (isLxc) "lxc" else "qemu"
+            val response = post(
+                base,
+                "/api2/json/nodes/${URLEncoder.encode(node, "UTF-8")}/$endpoint",
+                connection,
+                15000,
+                form
+            )
+            runTaskAndWait(base, connection, node, response)
+        }
+    }
+
     suspend fun getStorage(base: String, connection: ProxmoxConnection): List<ProxmoxStorage> =
         withContext(Dispatchers.IO) {
             val result = mutableListOf<ProxmoxStorage>()
