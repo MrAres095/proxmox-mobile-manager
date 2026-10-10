@@ -320,6 +320,33 @@ class ProxmoxApi {
             }.sorted()
         }
 
+    suspend fun getNodeFirewallRules(base: String, connection: ProxmoxConnection, node: ProxmoxNode): List<ProxmoxFirewallRule> =
+        withContext(Dispatchers.IO) {
+            val path = "/api2/json/nodes/${URLEncoder.encode(node.node, "UTF-8")}/firewall/rules"
+            val data = request(base, path, connection, 10000).optJSONArray("data")
+                ?: return@withContext emptyList()
+            buildList {
+                for (i in 0 until data.length()) {
+                    val item = data.optJSONObject(i) ?: continue
+                    add(
+                        ProxmoxFirewallRule(
+                            pos = item.optInt("pos"),
+                            action = item.optString("action"),
+                            type = item.optString("type"),
+                            iface = item.optString("iface"),
+                            source = item.optString("source"),
+                            dest = item.optString("dest"),
+                            proto = item.optString("proto"),
+                            dport = item.optString("dport"),
+                            sport = item.optString("sport"),
+                            comment = item.optString("comment"),
+                            enable = item.optBoolean("enable", true)
+                        )
+                    )
+                }
+            }
+        }
+
     suspend fun controlNode(base: String, connection: ProxmoxConnection, node: ProxmoxNode, action: String) {
         require(action == "reboot" || action == "shutdown") { "Nepoznata radnja za node." }
         post(base, "/api2/json/nodes/${URLEncoder.encode(node.node, "UTF-8")}/status", connection, 10000, "command=" + URLEncoder.encode(action, "UTF-8"))
