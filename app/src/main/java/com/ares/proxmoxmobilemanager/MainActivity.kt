@@ -42,14 +42,16 @@ fun ProxmoxApp() {
     var theme by remember { mutableStateOf(uiPrefs.getString("theme", "system") ?: "system") }
     val dark = theme != "light"
     val appColors = if (dark) darkColorScheme(
-        primary = androidx.compose.ui.graphics.Color(0xFF18C6D8),
-        onPrimary = androidx.compose.ui.graphics.Color(0xFF00191D),
-        secondary = androidx.compose.ui.graphics.Color(0xFF35D07F),
-        background = androidx.compose.ui.graphics.Color(0xFF05090C),
-        surface = androidx.compose.ui.graphics.Color(0xFF10181D),
-        surfaceVariant = androidx.compose.ui.graphics.Color(0xFF1A252C),
-        onSurface = androidx.compose.ui.graphics.Color(0xFFE4F0F4),
-        onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFF9BB0B9)
+        primary = androidx.compose.ui.graphics.Color(0xFF38D6E8),
+        onPrimary = androidx.compose.ui.graphics.Color(0xFF04171B),
+        secondary = androidx.compose.ui.graphics.Color(0xFF65E6A2),
+        background = androidx.compose.ui.graphics.Color(0xFF070B12),
+        surface = androidx.compose.ui.graphics.Color(0xFF101722),
+        surfaceVariant = androidx.compose.ui.graphics.Color(0xFF182331),
+        onSurface = androidx.compose.ui.graphics.Color(0xFFF0F6FC),
+        onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFF9BAFC2),
+        outline = androidx.compose.ui.graphics.Color(0xFF2B3B4D),
+        outlineVariant = androidx.compose.ui.graphics.Color(0xFF223142)
     ) else lightColorScheme(
         primary = androidx.compose.ui.graphics.Color(0xFF007C91),
         secondary = androidx.compose.ui.graphics.Color(0xFF16894F)
@@ -283,7 +285,22 @@ private fun ConnectionScreen(
     var secret by remember { mutableStateOf(initial.tokenSecret) }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Proxmox Mobile Manager") }, actions = { IconButton(onClick = onThemeSettings) { Icon(Icons.Default.Palette, null) } }) },
+        topBar = {
+            TopAppBar(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)) {
+                            Icon(Icons.Default.Dns, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(8.dp).size(24.dp))
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text("Proxmox Mobile", style = MaterialTheme.typography.titleLarge)
+                            Text("SERVER CONTROL", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.5.sp)
+                        }
+                    }
+                },
+                actions = { IconButton(onClick = onThemeSettings) { Icon(Icons.Default.Palette, null) } }
+            )
+        },
         bottomBar = {
             Surface(
                 modifier = Modifier.navigationBarsPadding(),
@@ -310,16 +327,17 @@ private fun ConnectionScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
                 .padding(padding)
-                .padding(20.dp)
+                .padding(horizontal = 16.dp, vertical = 14.dp)
                 .verticalScroll(androidx.compose.foundation.rememberScrollState()),
             verticalArrangement = Arrangement.Top
         ) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                tonalElevation = 2.dp
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 3.dp
             ) {
                 Row(
                     modifier = Modifier.padding(18.dp),
@@ -338,10 +356,10 @@ private fun ConnectionScreen(
                         )
                     }
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Upravljanje Proxmoxom", style = MaterialTheme.typography.titleLarge)
+                        Text("Sve pod kontrolom.", style = MaterialTheme.typography.headlineSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "Poveži se izravno na API servera i upravljaj virtualnim strojevima, spremištem i nodeovima.",
+                            "Sigurno poveži svoj Proxmox i upravljaj nodeovima, virtualnim strojevima, pohranom i zadacima s mobitela.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -349,7 +367,7 @@ private fun ConnectionScreen(
                 }
             }
             Spacer(Modifier.height(18.dp))
-            Text("TVOJI SERVERI", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Text("TVOJI SERVERI", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.6.sp)
             Spacer(Modifier.height(8.dp))
             ExposedDropdownMenuBox(expanded = profileMenu, onExpandedChange = { profileMenu = !profileMenu }) {
                 OutlinedTextField(profileName, {}, Modifier.fillMaxWidth().menuAnchor(), label = { Text("Profil servera") }, readOnly = true)
@@ -361,11 +379,13 @@ private fun ConnectionScreen(
             Spacer(Modifier.height(6.dp))
             Text("Spremi više Proxmox servera i brzo se prebacuj između njih.", style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.height(8.dp))
-            Text("Na lokalnoj mreži koristi IP, korisničko ime i lozinku. Za udaljeni pristup domenom koristi se API token.")
+            Text("BRZI SAVJET", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.3.sp)
+            Spacer(Modifier.height(5.dp))
+            Text("Lokalno: IP adresa, korisničko ime i lozinka. Udaljeno: domena i API token. Lozinka i token ostaju spremljeni u profilu na ovom uređaju.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(20.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Default.Wifi, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Text("Lokalna mreža", style = MaterialTheme.typography.titleMedium)
+                Text("Lokalna mreža", style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
             }
             Spacer(Modifier.height(6.dp))
             OutlinedTextField(local, { local = it }, Modifier.fillMaxWidth(), label = { Text("IP adresa") }, placeholder = { Text("npr. 192.168.1.37") }, singleLine = true)
@@ -380,7 +400,7 @@ private fun ConnectionScreen(
             Spacer(Modifier.height(14.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Default.Public, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Text("Udaljeni pristup", style = MaterialTheme.typography.titleMedium)
+                Text("Udaljeni pristup", style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
             }
             Spacer(Modifier.height(6.dp))
             OutlinedTextField(remote, { remote = it }, Modifier.fillMaxWidth(), label = { Text("Domena / javna IP") }, placeholder = { Text("https://proxmox.mojadomena.hr:8006") }, singleLine = true)
@@ -602,7 +622,7 @@ private fun Dashboard(
             TopAppBar(
                 title = {
                     Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Text("Proxmox Manager", style = MaterialTheme.typography.titleLarge)
+                        Text("Proxmox Control", style = MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
                         Text(base, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                     }
                 },
@@ -614,13 +634,13 @@ private fun Dashboard(
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(padding).padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("PREGLED SUSTAVA", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                        Text("PREGLED SUSTAVA", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.6.sp)
                         Spacer(Modifier.weight(1f))
                         if (loading || vmLoading) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -631,7 +651,7 @@ private fun Dashboard(
                     Card(
                         Modifier.fillMaxWidth(),
                         shape = MaterialTheme.shapes.extraLarge,
-                        colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color(0xFF10181D))
+                        colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color(0xFF101722))
                     ) {
                         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -661,7 +681,7 @@ private fun Dashboard(
                                 }
                             }
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Surface(Modifier.weight(1f), color = androidx.compose.ui.graphics.Color(0xFF17252B), shape = MaterialTheme.shapes.large) {
+                                Surface(Modifier.weight(1f), color = androidx.compose.ui.graphics.Color(0xFF182331), shape = MaterialTheme.shapes.large) {
                                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Icon(Icons.Default.Dns, contentDescription = null, tint = androidx.compose.ui.graphics.Color(0xFF35D07F), modifier = Modifier.size(16.dp))
