@@ -314,8 +314,42 @@ private fun ConnectionScreen(
                 .verticalScroll(androidx.compose.foundation.rememberScrollState()),
             verticalArrangement = Arrangement.Top
         ) {
-            Text("Poveži Proxmox", style = MaterialTheme.typography.headlineMedium)
-            Spacer(Modifier.height(12.dp))
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                tonalElevation = 2.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                    ) {
+                        Icon(
+                            Icons.Default.Dns,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(14.dp).size(32.dp)
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Upravljanje Proxmoxom", style = MaterialTheme.typography.titleLarge)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Poveži se izravno na API servera i upravljaj virtualnim strojevima, spremištem i nodeovima.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(18.dp))
+            Text("TVOJI SERVERI", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(8.dp))
             ExposedDropdownMenuBox(expanded = profileMenu, onExpandedChange = { profileMenu = !profileMenu }) {
                 OutlinedTextField(profileName, {}, Modifier.fillMaxWidth().menuAnchor(), label = { Text("Profil servera") }, readOnly = true)
                 ExposedDropdownMenu(expanded = profileMenu, onDismissRequest = { profileMenu = false }) {
@@ -328,7 +362,10 @@ private fun ConnectionScreen(
             Spacer(Modifier.height(8.dp))
             Text("Na lokalnoj mreži koristi IP, korisničko ime i lozinku. Za udaljeni pristup domenom koristi se API token.")
             Spacer(Modifier.height(20.dp))
-            Text("Lokalna mreža", style = MaterialTheme.typography.titleMedium)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Default.Wifi, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Text("Lokalna mreža", style = MaterialTheme.typography.titleMedium)
+            }
             Spacer(Modifier.height(6.dp))
             OutlinedTextField(local, { local = it }, Modifier.fillMaxWidth(), label = { Text("IP adresa") }, placeholder = { Text("npr. 192.168.1.37") }, singleLine = true)
             Spacer(Modifier.height(10.dp))
@@ -338,7 +375,12 @@ private fun ConnectionScreen(
             Spacer(Modifier.height(10.dp))
             OutlinedTextField(password, { password = it }, Modifier.fillMaxWidth(), label = { Text("Lozinka") }, singleLine = true, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
             Spacer(Modifier.height(18.dp))
-            Text("Udaljeni pristup", style = MaterialTheme.typography.titleMedium)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(14.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Default.Public, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Text("Udaljeni pristup", style = MaterialTheme.typography.titleMedium)
+            }
             Spacer(Modifier.height(6.dp))
             OutlinedTextField(remote, { remote = it }, Modifier.fillMaxWidth(), label = { Text("Domena / javna IP") }, placeholder = { Text("https://proxmox.mojadomena.hr:8006") }, singleLine = true)
             Spacer(Modifier.height(10.dp))
