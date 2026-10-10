@@ -520,6 +520,20 @@ class ProxmoxApi {
         }
     }
 
+    suspend fun getTaskLog(base: String, connection: ProxmoxConnection, node: String, upid: String, limit: Int = 500): List<String> = withContext(Dispatchers.IO) {
+        val encodedNode = URLEncoder.encode(node, "UTF-8")
+        val encodedUpid = URLEncoder.encode(upid, "UTF-8")
+        val json = request(base, "/api2/json/nodes/$encodedNode/tasks/$encodedUpid/log?limit=$limit", connection, 10000)
+        val data = json.optJSONArray("data") ?: return@withContext emptyList()
+        buildList {
+            for (i in 0 until data.length()) {
+                val row = data.optJSONObject(i) ?: continue
+                val text = row.optString("t")
+                if (text.isNotBlank()) add(text)
+            }
+        }
+    }
+
     suspend fun getTasks(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, limit: Int = 100): List<ProxmoxTask> = withContext(Dispatchers.IO) {
         val endpoint = if (vm.isQemu) "qemu" else "lxc"
         val json = request(base, "/api2/json/nodes/${URLEncoder.encode(vm.node, "UTF-8")}/$endpoint/${vm.vmid}/tasks?limit=$limit", connection, 7000)
