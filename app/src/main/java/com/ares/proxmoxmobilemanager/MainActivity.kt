@@ -2079,6 +2079,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
  val stateKey=remember(base,vm.node,vm.vmid){"console_"+base.hashCode()+"_"+vm.node+"_"+vm.vmid}
  var output by remember(stateKey){mutableStateOf(consolePrefs.getString(stateKey,"Spajanje na Proxmox konzolu...\n")?:"Spajanje na Proxmox konzolu...\n")}
  val latestOutput by rememberUpdatedState(output)
+ val terminalScroll=rememberScrollState()
  var input by remember{mutableStateOf("")}
  var connected by remember{mutableStateOf(false)}
  var connecting by remember{mutableStateOf(false)}
@@ -2119,6 +2120,10 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
  }
 
  LaunchedEffect(vm){ connect() }
+ LaunchedEffect(output){
+  delay(30)
+  terminalScroll.scrollTo(terminalScroll.maxValue)
+ }
 
  androidx.compose.runtime.DisposableEffect(lifecycleOwner,vm){
   val observer=androidx.lifecycle.LifecycleEventObserver{_,event->
@@ -2160,22 +2165,29 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
 
  Scaffold(
   topBar={TopAppBar(
-   title={Text("Console · "+vm.name)},
+   title={
+    Column(verticalArrangement=Arrangement.spacedBy(1.dp)){
+     Text(vm.name, maxLines=1)
+     Text("KONZOLA · "+vm.node+" · "+vm.vmid,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant,letterSpacing=1.sp)
+    }
+   },
    navigationIcon={IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,"Natrag")}},
    actions={
-    TextButton(enabled=output.isNotBlank(),onClick={clipboard.setText(androidx.compose.ui.text.AnnotatedString(output))}){Text("Kopiraj")}
-    Text(if(connected)"● LIVE" else if(connecting)"○ spajanje" else "○ offline",Modifier.padding(end=8.dp))
+    Text(if(connected)"● LIVE" else if(connecting)"○ spajanje" else "○ offline",Modifier.padding(end=2.dp),style=MaterialTheme.typography.labelSmall,color=if(connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+    IconButton(onClick={connect},enabled=!connecting){Icon(Icons.Default.Refresh,contentDescription="Ponovno poveži konzolu")}
+    IconButton(onClick={ { clipboard.setText(androidx.compose.ui.text.AnnotatedString(output)) } },enabled=output.isNotBlank()){Icon(Icons.Default.ContentCopy,contentDescription="Kopiraj izlaz")}
    }
   )}
  ){p->
-  Column(Modifier.fillMaxSize().padding(p).padding(horizontal=8.dp, vertical=6.dp), verticalArrangement=Arrangement.spacedBy(6.dp)){
+  Column(Modifier.fillMaxSize().padding(p).padding(horizontal=8.dp, vertical=6.dp), verticalArrangement=Arrangement.spacedBy(7.dp)){
    Surface(Modifier.fillMaxWidth().weight(1f), color=terminalBg, shape=MaterialTheme.shapes.medium){
     Column(Modifier.fillMaxSize().padding(10.dp)){
      SelectionContainer(Modifier.weight(1f).fillMaxWidth()){
-      Text(output,Modifier.fillMaxWidth(),color=terminalFg,style=MaterialTheme.typography.bodySmall.copy(fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace,lineHeight=14.sp))
+      Text(output,Modifier.fillMaxWidth().verticalScroll(terminalScroll),color=terminalFg,style=MaterialTheme.typography.bodySmall.copy(fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace,lineHeight=15.sp))
      }
-     Row(Modifier.fillMaxWidth().padding(top=6.dp),verticalAlignment=Alignment.CenterVertically){
-      Text("›",color=androidx.compose.ui.graphics.Color(0xFF35D07F),style=MaterialTheme.typography.bodyMedium.copy(fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace))
+     HorizontalDivider(color=androidx.compose.ui.graphics.Color(0xFF234033))
+     Row(Modifier.fillMaxWidth().padding(top=7.dp),verticalAlignment=Alignment.CenterVertically){
+      Text("›",color=androidx.compose.ui.graphics.Color(0xFF35D07F),style=MaterialTheme.typography.bodyLarge.copy(fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace))
       Spacer(Modifier.width(8.dp))
       androidx.compose.foundation.text.BasicTextField(
        value=input,
@@ -2194,21 +2206,24 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
         }
        }
       )
+      Spacer(Modifier.width(6.dp))
+      IconButton(onClick={sendCommand()},enabled=connected&&input.isNotEmpty(),modifier=Modifier.size(36.dp)){
+       Icon(Icons.Default.Send,contentDescription="Pošalji naredbu",tint=if(connected&&input.isNotEmpty()) androidx.compose.ui.graphics.Color(0xFF35D07F) else terminalFg.copy(alpha=0.35f))
+      }
      }
     }
    }
    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
-    OutlinedButton({clipboard.setText(androidx.compose.ui.text.AnnotatedString(output))},enabled=output.isNotBlank(),modifier=Modifier.weight(1f)){Text("Kopiraj sve")}
-    OutlinedButton({output="";error=null},modifier=Modifier.weight(1f)){Text("Očisti")}
+    OutlinedButton({clipboard.setText(androidx.compose.ui.text.AnnotatedString(output))},enabled=output.isNotBlank(),modifier=Modifier.weight(1f)){Icon(Icons.Default.ContentCopy,null,modifier=Modifier.size(16.dp));Spacer(Modifier.width(5.dp));Text("Kopiraj sve")}
+    OutlinedButton({output="";error=null},modifier=Modifier.weight(1f)){Icon(Icons.Default.DeleteSweep,null,modifier=Modifier.size(16.dp));Spacer(Modifier.width(5.dp));Text("Očisti prikaz")}
    }
-   if(error!=null)Text(error!!,color=MaterialTheme.colorScheme.error)
-   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){
-    TextButton({console.send("\u0003")},enabled=connected){Text("Ctrl+C")}
-    TextButton({console.send("\u0004")},enabled=connected){Text("Ctrl+D")}
-    TextButton({console.send("\t")},enabled=connected){Text("Tab")}
-    TextButton({console.send("\u001b[A")},enabled=connected){Text("↑")}
-    TextButton({console.send("\u001b[B")},enabled=connected){Text("↓")}
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp),verticalAlignment=Alignment.CenterVertically){
+    Text("TIPKE",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+    listOf("Ctrl+C" to "\u0003","Ctrl+D" to "\u0004","Tab" to "\t","↑" to "\u001b[A","↓" to "\u001b[B").forEach{(label,sequence)->
+     FilledTonalButton(onClick={console.send(sequence)},enabled=connected,modifier=Modifier.weight(1f).height(38.dp),contentPadding=PaddingValues(horizontal=4.dp,vertical=0.dp)){Text(label,style=MaterialTheme.typography.labelSmall,maxLines=1)}
+    }
    }
+   if(error!=null)Text(error!!,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
   }
  }
 }
