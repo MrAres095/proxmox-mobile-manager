@@ -551,6 +551,9 @@ private fun Dashboard(
     var createGuestTemplate by remember { mutableStateOf("") }
     var createGuestPassword by remember { mutableStateOf("") }
     var createGuestBusy by remember { mutableStateOf(false) }
+    var deleteGuestVm by remember { mutableStateOf<ProxmoxVm?>(null) }
+    var deleteGuestConfirmation by remember { mutableStateOf("") }
+    var deleteGuestBusy by remember { mutableStateOf(false) }
     var detailsVm by remember { mutableStateOf<ProxmoxVm?>(null) }
     var detailsConfig by remember { mutableStateOf<ProxmoxVmConfig?>(null) }
     var detailsLoading by remember { mutableStateOf(false) }
@@ -908,7 +911,7 @@ private fun Dashboard(
                 item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() } }
             }
             items(orderedVms, key = { it.node + "-" + it.type + "-" + it.vmid }) { vm ->
-                VmCard(vm, vmLoading, onVmAction, onConsole, onSnapshot, onEditConfig = { selected ->
+                VmCard(vm, vmLoading, onVmAction, onConsole, onSnapshot, onDelete = { selected -> deleteGuestVm = selected; deleteGuestConfirmation = "" }, onEditConfig = { selected ->
                     editVm = selected
                 }, onSnapshots = { selected ->
                     snapshotsVm = selected
@@ -1476,6 +1479,39 @@ private fun Dashboard(
         )
     }
 
+    if (deleteGuestVm != null) {
+        val target = deleteGuestVm!!
+        AlertDialog(
+            onDismissRequest = { if (!deleteGuestBusy) deleteGuestVm = null },
+            title = { Text("Trajno obriši ${target.name}?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("${target.type.uppercase()} • VMID ${target.vmid} • ${target.node}")
+                    Text("Ova radnja trajno briše resurs i njegove pridružene diskove. Ne može se poništiti.", color = MaterialTheme.colorScheme.error)
+                    Text("Za potvrdu upiši VMID ${target.vmid}.")
+                    OutlinedTextField(value = deleteGuestConfirmation, onValueChange = { deleteGuestConfirmation = it.filter(Char::isDigit).take(9) }, label = { Text("Potvrdi VMID") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !deleteGuestBusy)
+                    if (deleteGuestBusy) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = !deleteGuestBusy && !target.isRunning && deleteGuestConfirmation == target.vmid.toString(), onClick = {
+                    deleteGuestBusy = true
+                    scope.launch {
+                        try {
+                            api.deleteGuest(base, connection, target)
+                            actionMessage = "${target.name} (VMID ${target.vmid}) je obrisan."
+                            deleteGuestVm = null
+                            onRefresh()
+                        } catch (e: Exception) {
+                            actionMessage = e.message ?: "Brisanje nije uspjelo."
+                        } finally { deleteGuestBusy = false }
+                    }
+                }) { Text(if (deleteGuestBusy) "Brišem..." else "Trajno obriši") }
+            },
+            dismissButton = { TextButton(enabled = !deleteGuestBusy, onClick = { deleteGuestVm = null }) { Text("Odustani") } }
+        )
+    }
+
     if (actionMessage != null) {
         AlertDialog(onDismissRequest={actionMessage=null},title={Text("Proxmox")},text={Text(actionMessage!!)},confirmButton={TextButton(onClick={actionMessage=null}){Text("OK")}})
     }
@@ -1700,6 +1736,7 @@ private fun VmCard(
     onAction: (ProxmoxVm, VmAction) -> Unit,
     onConsole: (ProxmoxVm) -> Unit,
     onSnapshot: (ProxmoxVm, String, String) -> Unit,
+    onDelete: (ProxmoxVm) -> Unit,
     onBackup: (ProxmoxVm) -> Unit,
     onEditConfig: (ProxmoxVm) -> Unit,
     onSnapshots: (ProxmoxVm) -> Unit,
@@ -1770,6 +1807,12 @@ private fun VmCard(
             OutlinedButton({ onConsole(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()){ Icon(Icons.Default.Terminal,null); Spacer(Modifier.width(4.dp)); Text("Console") }
             Spacer(Modifier.height(8.dp))
             OutlinedButton({ onDetails(vm) }, enabled=!busy, modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.Tune, null); Spacer(Modifier.width(4.dp)); Text("Detalji / konfiguracija") }
+            Spacer(Modifier.height(6.dp))
+            OutlinedButton({ onDelete(vm) }, enabled = !busy && !vm.isRunning, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+                Icon(Icons.Default.DeleteForever, null)
+                Spacer(Modifier.width(4.dp))
+                Text(if (vm.isRunning) "Zaustavi prije brisanja" else "Trajno obriši VM / LXC")
+            }
             Spacer(Modifier.height(6.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 OutlinedButton({ onEditConfig(vm) }, enabled=!busy, modifier=Modifier.weight(1f)) { Text("Uredi") }
