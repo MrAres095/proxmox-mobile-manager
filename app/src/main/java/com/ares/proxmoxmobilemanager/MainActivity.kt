@@ -538,6 +538,19 @@ private fun Dashboard(
     var updateChecking by remember { mutableStateOf(false) }
     var updateInstalling by remember { mutableStateOf(false) }
     var updateMessage by remember { mutableStateOf<String?>(null) }
+    var createGuestOpen by remember { mutableStateOf(false) }
+    var createGuestKind by remember { mutableStateOf("qemu") }
+    var createGuestNode by remember { mutableStateOf(nodes.firstOrNull()?.node.orEmpty()) }
+    var createGuestId by remember { mutableStateOf("") }
+    var createGuestName by remember { mutableStateOf("") }
+    var createGuestCores by remember { mutableStateOf("2") }
+    var createGuestMemory by remember { mutableStateOf("2048") }
+    var createGuestDisk by remember { mutableStateOf("32") }
+    var createGuestStorage by remember { mutableStateOf(storage.firstOrNull { it.active && it.enabled }?.storage.orEmpty()) }
+    var createGuestBridge by remember { mutableStateOf("vmbr0") }
+    var createGuestTemplate by remember { mutableStateOf("") }
+    var createGuestPassword by remember { mutableStateOf("") }
+    var createGuestBusy by remember { mutableStateOf(false) }
     var detailsVm by remember { mutableStateOf<ProxmoxVm?>(null) }
     var detailsConfig by remember { mutableStateOf<ProxmoxVmConfig?>(null) }
     var detailsLoading by remember { mutableStateOf(false) }
@@ -823,6 +836,30 @@ private fun Dashboard(
                 }
             }
             item { Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { Text("Replication", style = MaterialTheme.typography.titleLarge); Spacer(Modifier.height(6.dp)); Text("Pregled Proxmox replication jobova između nodeova."); Spacer(Modifier.height(10.dp)); Button(onClick = onReplication, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Sync, contentDescription = null); Spacer(Modifier.width(6.dp)); Text("Otvori Replication") } } } }
+            item {
+                Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.extraLarge) {
+                    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.13f)) {
+                            Icon(Icons.Default.AddToQueue, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(10.dp).size(26.dp))
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text("Novi resurs", style = MaterialTheme.typography.titleMedium)
+                            Text("Kreiraj VM ili LXC izravno na Proxmox nodeu.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Button(onClick = {
+                            createGuestNode = nodes.firstOrNull { it.status.equals("online", true) }?.node ?: nodes.firstOrNull()?.node.orEmpty()
+                            createGuestStorage = storage.firstOrNull { it.active && it.enabled && it.node == createGuestNode && (it.content.contains("images") || it.content.contains("rootdir")) }?.storage
+                                ?: storage.firstOrNull { it.active && it.enabled }?.storage.orEmpty()
+                            createGuestOpen = true
+                        }, enabled = nodes.any { it.status.equals("online", true) } && storage.any { it.active && it.enabled }) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(Modifier.width(5.dp))
+                            Text("Kreiraj")
+                        }
+                    }
+                }
+            }
             item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -1379,6 +1416,63 @@ private fun Dashboard(
                 }) { Text(if (cloneLoading) "Kloniranje..." else "Kloniraj") }
             },
             dismissButton = { TextButton(enabled = !cloneLoading, onClick = { cloneVmState = null }) { Text("Odustani") } }
+        )
+    }
+
+    if (createGuestOpen) {
+        AlertDialog(
+            onDismissRequest = { if (!createGuestBusy) createGuestOpen = false },
+            title = { Text("Kreiraj VM / LXC") },
+            text = {
+                Column(
+                    Modifier.fillMaxWidth().heightIn(max = 560.dp).verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(9.dp)
+                ) {
+                    Text("Vrsta resursa", style = MaterialTheme.typography.labelLarge)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = createGuestKind == "qemu", onClick = { createGuestKind = "qemu" }, label = { Text("QEMU VM") }, enabled = !createGuestBusy)
+                        FilterChip(selected = createGuestKind == "lxc", onClick = { createGuestKind = "lxc" }, label = { Text("LXC container") }, enabled = !createGuestBusy)
+                    }
+                    OutlinedTextField(value = createGuestNode, onValueChange = { createGuestNode = it }, label = { Text("Node") }, supportingText = { Text("Dostupni: " + nodes.filter { it.status.equals("online", true) }.joinToString { it.node }) }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !createGuestBusy)
+                    OutlinedTextField(value = createGuestId, onValueChange = { createGuestId = it.filter(Char::isDigit).take(9) }, label = { Text("VMID") }, placeholder = { Text("npr. 120") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !createGuestBusy)
+                    OutlinedTextField(value = createGuestName, onValueChange = { createGuestName = it.take(80) }, label = { Text(if (createGuestKind == "lxc") "Hostname" else "Naziv VM-a") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !createGuestBusy)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(value = createGuestCores, onValueChange = { createGuestCores = it.filter(Char::isDigit).take(3) }, label = { Text("CPU jezgre") }, singleLine = true, modifier = Modifier.weight(1f), enabled = !createGuestBusy)
+                        OutlinedTextField(value = createGuestMemory, onValueChange = { createGuestMemory = it.filter(Char::isDigit).take(7) }, label = { Text("RAM (MB)") }, singleLine = true, modifier = Modifier.weight(1f), enabled = !createGuestBusy)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(value = createGuestDisk, onValueChange = { createGuestDisk = it.filter(Char::isDigit).take(5) }, label = { Text("Disk (GB)") }, singleLine = true, modifier = Modifier.weight(1f), enabled = !createGuestBusy)
+                        OutlinedTextField(value = createGuestStorage, onValueChange = { createGuestStorage = it.take(80) }, label = { Text("Storage") }, supportingText = { Text("Dostupni: " + storage.filter { it.active && it.enabled }.map { it.storage }.distinct().joinToString()) }, singleLine = true, modifier = Modifier.weight(1f), enabled = !createGuestBusy)
+                    }
+                    OutlinedTextField(value = createGuestBridge, onValueChange = { createGuestBridge = it.take(80) }, label = { Text("Mrežni bridge") }, supportingText = { Text("Najčešće vmbr0") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !createGuestBusy)
+                    if (createGuestKind == "lxc") {
+                        OutlinedTextField(value = createGuestTemplate, onValueChange = { createGuestTemplate = it.take(240) }, label = { Text("LXC template") }, placeholder = { Text("local:vztmpl/debian-12-standard_*.tar.zst") }, supportingText = { Text("Mora već postojati na Proxmox storageu.") }, modifier = Modifier.fillMaxWidth(), enabled = !createGuestBusy)
+                        OutlinedTextField(value = createGuestPassword, onValueChange = { createGuestPassword = it }, label = { Text("Root lozinka za LXC") }, supportingText = { Text("Najmanje 8 znakova") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !createGuestBusy)
+                    } else {
+                        Text("VM će dobiti prazan disk. Prije prvog pokretanja dodaj instalacijski ISO kroz Proxmox ili konfiguraciju VM-a.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (createGuestBusy) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !createGuestBusy && createGuestId.toIntOrNull() != null && createGuestName.isNotBlank() && createGuestNode.isNotBlank() && createGuestStorage.isNotBlank() && createGuestCores.toIntOrNull() != null && createGuestMemory.toIntOrNull() != null && createGuestDisk.toIntOrNull() != null && createGuestBridge.isNotBlank() && (createGuestKind != "lxc" || (createGuestTemplate.isNotBlank() && createGuestPassword.length >= 8)),
+                    onClick = {
+                        createGuestBusy = true
+                        scope.launch {
+                            try {
+                                api.createGuest(base, connection, createGuestNode.trim(), createGuestKind, createGuestId.toInt(), createGuestName.trim(), createGuestCores.toInt(), createGuestMemory.toInt(), createGuestDisk.toInt(), createGuestStorage.trim(), createGuestBridge.trim(), createGuestTemplate.trim(), createGuestPassword)
+                                actionMessage = "${if (createGuestKind == "lxc") "LXC" else "VM"} ${createGuestName.trim()} (VMID ${createGuestId.trim()}) uspješno je kreiran."
+                                createGuestOpen = false
+                                onRefresh()
+                            } catch (e: Exception) {
+                                actionMessage = e.message ?: "Kreiranje resursa nije uspjelo."
+                            } finally { createGuestBusy = false }
+                        }
+                    }
+                ) { Text(if (createGuestBusy) "Kreiranje..." else "Kreiraj resurs") }
+            },
+            dismissButton = { TextButton(enabled = !createGuestBusy, onClick = { createGuestOpen = false }) { Text("Odustani") } }
         )
     }
 
