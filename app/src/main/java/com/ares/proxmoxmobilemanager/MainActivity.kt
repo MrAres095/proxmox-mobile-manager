@@ -2175,7 +2175,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
    navigationIcon={IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,"Natrag")}},
    actions={
     Text(if(connected)"● LIVE" else if(connecting)"○ spajanje" else "○ offline",Modifier.padding(end=2.dp),style=MaterialTheme.typography.labelSmall,color=if(connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-    IconButton(onClick={connect},enabled=!connecting){Icon(Icons.Default.Refresh,contentDescription="Ponovno poveži konzolu")}
+    IconButton(onClick={connect()},enabled=!connecting){Icon(Icons.Default.Refresh,contentDescription="Ponovno poveži konzolu")}
     IconButton(onClick={ { clipboard.setText(androidx.compose.ui.text.AnnotatedString(output)) } },enabled=output.isNotBlank()){Icon(Icons.Default.ContentCopy,contentDescription="Kopiraj izlaz")}
    }
   )}
