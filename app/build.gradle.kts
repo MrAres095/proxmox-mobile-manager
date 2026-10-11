@@ -75,6 +75,13 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("org.connectbot:termlib:0.3.5")
+    implementation("org.connectbot:termlib:0.3.5") {
+        exclude(group = "androidx.core")
+        exclude(group = "androidx.compose")
+        exclude(group = "androidx.activity")
+        exclude(group = "androidx.lifecycle")
+        exclude(group = "androidx.appcompat")
+        exclude(group = "com.google.android.material")
+    }
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
