@@ -15,7 +15,7 @@ val releaseVersionName = providers.gradleProperty("APP_VERSION_NAME")
 
 android {
     namespace = "com.ares.proxmoxmobilemanager"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.ares.proxmoxmobilemanager"
@@ -75,7 +75,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("org.connectbot:termlib:0.3.5") {
+    implementation("org.connectbot:termlib:0.0.38") {
         exclude(group = "androidx.core")
         exclude(group = "androidx.compose")
         exclude(group = "androidx.activity")
