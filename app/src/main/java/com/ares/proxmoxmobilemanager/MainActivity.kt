@@ -2068,211 +2068,173 @@ private fun formatBytes(value: Long): String {
 }
 
 
-private fun decodeConsoleText(bytes: ByteArray): String {
- val raw = bytes.toString(Charsets.UTF_8)
- // Proxmox termproxy frames terminal data as: 0:<byte-count>:<payload>.
- val payload = Regex("^0:[0-9]+:").replaceFirst(raw, "")
- val out = StringBuilder()
- var i = 0
- while (i < payload.length) {
-  val ch = payload[i]
-  if (ch.code == 27) {
-   i++
-   if (i < payload.length && payload[i] == '[') {
-    // CSI control sequence: skip parameters/intermediates and its final byte.
-    i++
-    while (i < payload.length && payload[i].code in 0x20..0x3F) i++
-    if (i < payload.length) i++
-   } else if (i < payload.length && payload[i] == ']') {
-    // OSC title/color sequence, normally terminated by BEL.
-    i++
-    while (i < payload.length && payload[i].code != 7 && payload[i].code != 27) i++
-    if (i < payload.length && payload[i].code == 7) i++
-   } else if (i < payload.length) {
-    i++
-   }
-   continue
-  }
-  when (ch.code) {
-   13 -> {
-    if (i + 1 >= payload.length || payload[i + 1].code != 10) out.append('\n')
-   }
-   10 -> out.append('\n')
-   9 -> out.append('\t')
-   else -> if (ch.code >= 32 && ch.code != 127) out.append(ch)
-  }
-  i++
- }
- return out.toString()
+private fun decodeTermproxyPayload(bytes: ByteArray): ByteArray? {
+    // Proxmox termproxy uses an ASCII frame header: 0:<byte-count>:<raw terminal bytes>.
+    if (bytes.size < 4 || bytes[0] != '0'.code.toByte() || bytes[1] != ':'.code.toByte()) return null
+    var separator = 2
+    while (separator < bytes.size && bytes[separator] in '0'.code.toByte()..'9'.code.toByte()) separator++
+    if (separator == 2 || separator >= bytes.size || bytes[separator] != ':'.code.toByte()) return null
+    val count = bytes.copyOfRange(2, separator).toString(Charsets.US_ASCII).toIntOrNull() ?: return null
+    val payloadStart = separator + 1
+    if (count < 0 || payloadStart + count > bytes.size) return null
+    return bytes.copyOfRange(payloadStart, payloadStart + count)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,onBack:()->Unit){
- val scope=rememberCoroutineScope()
- val lifecycleOwner=androidx.lifecycle.compose.LocalLifecycleOwner.current
- val clipboard=androidx.compose.ui.platform.LocalClipboardManager.current
- val context=androidx.compose.ui.platform.LocalContext.current
- val focusManager=androidx.compose.ui.platform.LocalFocusManager.current
- val consolePrefs=remember{context.getSharedPreferences("console_state", Context.MODE_PRIVATE)}
- val stateKey=remember(base,vm.node,vm.vmid){"console_"+base.hashCode()+"_"+vm.node+"_"+vm.vmid}
- var output by remember(stateKey){mutableStateOf(consolePrefs.getString(stateKey,"Spajanje na Proxmox konzolu...\n")?:"Spajanje na Proxmox konzolu...\n")}
- val latestOutput by rememberUpdatedState(output)
- val terminalScroll=rememberScrollState()
- var input by remember{mutableStateOf("")}
- var connected by remember{mutableStateOf(false)}
- var connecting by remember{mutableStateOf(false)}
- var error by remember{mutableStateOf<String?>(null)}
- val terminalBg=androidx.compose.ui.graphics.Color(0xFF020506)
- val terminalFg=androidx.compose.ui.graphics.Color(0xFFD6F4E1)
-
- fun sendCommand(){
-  if(!connected || input.isEmpty()) return
-  console.send(input+"\r")
-  input=""
-  focusManager.clearFocus()
- }
-
- fun connect(){
-  if(connecting) return
-  connecting=true
-  error=null
-  scope.launch{
-   try{
-    console.open(base,connection,vm,{b->
-     val t=decodeConsoleText(b)
-     if(t=="OK") connected=true else output=(output+t).takeLast(50000)
-    },{reason->
-     connected=false
-     if(reason!=null) output=(output+"\n[Veza zatvorena: "+reason+"]\n").takeLast(50000)
-    },{e->
-     connected=false
-     error=e.message?:"Greška konzole"
-    })
-   }catch(e:Exception){
-    connected=false
-    error=e.message?:"Spajanje na konzolu nije uspjelo."
-   }finally{
-    connecting=false
-   }
-  }
- }
-
- LaunchedEffect(vm){ connect() }
- LaunchedEffect(output){
-  delay(30)
-  terminalScroll.scrollTo(terminalScroll.maxValue)
- }
-
- androidx.compose.runtime.DisposableEffect(lifecycleOwner,vm){
-  val observer=androidx.lifecycle.LifecycleEventObserver{_,event->
-   when(event){
-    androidx.lifecycle.Lifecycle.Event.ON_RESUME -> if(!connected) connect()
-    androidx.lifecycle.Lifecycle.Event.ON_STOP -> consolePrefs.edit().putString(stateKey,latestOutput.takeLast(30000)).apply()
-    else -> Unit
-   }
-  }
-  lifecycleOwner.lifecycle.addObserver(observer)
-  onDispose{
-   lifecycleOwner.lifecycle.removeObserver(observer)
-   consolePrefs.edit().putString(stateKey,latestOutput.takeLast(30000)).apply()
-   console.close()
-  }
- }
-
- LaunchedEffect(vm, connected){
-  if (connected) {
-   while (true) {
-    delay(15000)
-    if (connected) console.ping()
-   }
-  }
- }
-
- LaunchedEffect(vm){
-  var retryDelay = 1000L
-  while (true) {
-   delay(retryDelay)
-   if (!connected && !connecting) {
-    connect()
-    retryDelay = (retryDelay * 2).coerceAtMost(15000L)
-   } else if (connected) {
-    retryDelay = 1000L
-   }
-  }
- }
-
- Scaffold(
-  topBar={TopAppBar(
-   title={
-    Column(verticalArrangement=Arrangement.spacedBy(1.dp)){
-     Text(vm.name, maxLines=1)
-     Text("KONZOLA · "+vm.node+" · "+vm.vmid,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant,letterSpacing=1.sp)
+    val scope=rememberCoroutineScope()
+    val lifecycleOwner=androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val clipboard=androidx.compose.ui.platform.LocalClipboardManager.current
+    val context=androidx.compose.ui.platform.LocalContext.current
+    val consolePrefs=remember{context.getSharedPreferences("console_state", Context.MODE_PRIVATE)}
+    val stateKey=remember(base,vm.node,vm.vmid){"console_"+base.hashCode()+"_"+vm.node+"_"+vm.vmid}
+    var output by remember(stateKey){mutableStateOf(consolePrefs.getString(stateKey,"")?:"")}
+    val latestOutput by rememberUpdatedState(output)
+    var connected by remember{mutableStateOf(false)}
+    var connecting by remember{mutableStateOf(false)}
+    var error by remember{mutableStateOf<String?>(null)}
+    val terminalBg=androidx.compose.ui.graphics.Color(0xFF020506)
+    val terminalFg=androidx.compose.ui.graphics.Color(0xFFD6F4E1)
+    val terminalEmulator = remember(base, vm.node, vm.vmid) {
+        org.connectbot.terminal.TerminalEmulatorFactory.create(
+            initialRows = 32,
+            initialCols = 100,
+            defaultForeground = terminalFg,
+            defaultBackground = terminalBg,
+            onKeyboardInput = { bytes -> console.send(bytes.toString(Charsets.UTF_8)) },
+            onResize = { dimensions -> console.resize(dimensions.columns, dimensions.rows) }
+        )
     }
-   },
-   navigationIcon={IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,"Natrag")}},
-   actions={
-    Text(if(connected)"● LIVE" else if(connecting)"○ spajanje" else "○ offline",Modifier.padding(end=2.dp),style=MaterialTheme.typography.labelSmall,color=if(connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-    IconButton(onClick={connect()},enabled=!connecting){Icon(Icons.Default.Refresh,contentDescription="Ponovno poveži konzolu")}
-    IconButton(onClick={ { clipboard.setText(androidx.compose.ui.text.AnnotatedString(output)) } },enabled=output.isNotBlank()){Icon(Icons.Default.ContentCopy,contentDescription="Kopiraj izlaz")}
-   }
-  )}
- ){p->
-  Column(Modifier.fillMaxSize().padding(p).padding(horizontal=8.dp, vertical=6.dp), verticalArrangement=Arrangement.spacedBy(7.dp)){
-   Surface(Modifier.fillMaxWidth().weight(1f), color=terminalBg, shape=MaterialTheme.shapes.medium){
-    Column(Modifier.fillMaxSize().padding(10.dp)){
-     SelectionContainer(Modifier.weight(1f).fillMaxWidth()){
-      Text(output,Modifier.fillMaxWidth().verticalScroll(terminalScroll),color=terminalFg,style=MaterialTheme.typography.bodySmall.copy(fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace,lineHeight=15.sp))
-     }
-     HorizontalDivider(color=androidx.compose.ui.graphics.Color(0xFF234033))
-     Row(Modifier.fillMaxWidth().padding(top=7.dp),verticalAlignment=Alignment.CenterVertically){
-      Text("›",color=androidx.compose.ui.graphics.Color(0xFF35D07F),style=MaterialTheme.typography.bodyLarge.copy(fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace))
-      Spacer(Modifier.width(8.dp))
-      androidx.compose.foundation.text.BasicTextField(
-       value=input,
-       onValueChange={input=it},
-       modifier=Modifier.weight(1f).fillMaxWidth(),
-       enabled=connected,
-       singleLine=true,
-       textStyle=MaterialTheme.typography.bodySmall.copy(color=terminalFg,fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace),
-       cursorBrush=androidx.compose.ui.graphics.SolidColor(terminalFg),
-       keyboardOptions=androidx.compose.foundation.text.KeyboardOptions(imeAction=androidx.compose.ui.text.input.ImeAction.Send, capitalization=androidx.compose.ui.text.input.KeyboardCapitalization.None),
-       keyboardActions=androidx.compose.foundation.text.KeyboardActions(onSend={sendCommand()}),
-       decorationBox={innerTextField->
-        Box(Modifier.fillMaxWidth()){
-         if(input.isEmpty()) Text(if(connected)"Upiši ili zalijepi naredbu…" else "Čekam vezu s konzolom…",color=terminalFg.copy(alpha=0.55f),style=MaterialTheme.typography.bodySmall.copy(fontFamily=androidx.compose.ui.text.font.FontFamily.Monospace))
-         innerTextField()
+
+    fun connect(){
+        if(connecting) return
+        connecting=true
+        error=null
+        scope.launch{
+            try{
+                console.open(base,connection,vm,{b->
+                    val message=b.toString(Charsets.UTF_8)
+                    if(message=="OK" || message.trim()=="OK") {
+                        connected=true
+                    } else {
+                        val payload=decodeTermproxyPayload(b)
+                        if(payload!=null) {
+                            terminalEmulator.writeInput(payload)
+                            connected=true
+                        } else if(message.startsWith("ERR") || message.contains("authentication failed",true)) {
+                            error=message.take(500)
+                        }
+                    }
+                },{reason->
+                    connected=false
+                    if(reason!=null) output=(output+"\n[Veza zatvorena: "+reason+"]\n").takeLast(30000)
+                },{e->
+                    connected=false
+                    error=e.message?:"Greška konzole"
+                })
+            }catch(e:Exception){
+                connected=false
+                error=e.message?:"Spajanje na konzolu nije uspjelo."
+            }finally{
+                connecting=false
+            }
         }
-       }
-      )
-      Spacer(Modifier.width(6.dp))
-      IconButton(onClick={sendCommand()},enabled=connected&&input.isNotEmpty(),modifier=Modifier.size(36.dp)){
-       Icon(Icons.Default.Send,contentDescription="Pošalji naredbu",tint=if(connected&&input.isNotEmpty()) androidx.compose.ui.graphics.Color(0xFF35D07F) else terminalFg.copy(alpha=0.35f))
-      }
-     }
     }
-   }
-   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
-    OutlinedButton({clipboard.setText(androidx.compose.ui.text.AnnotatedString(output))},enabled=output.isNotBlank(),modifier=Modifier.weight(1f)){Icon(Icons.Default.ContentCopy,null,modifier=Modifier.size(16.dp));Spacer(Modifier.width(5.dp));Text("Kopiraj sve")}
-    OutlinedButton({output="";error=null},modifier=Modifier.weight(1f)){Icon(Icons.Default.DeleteSweep,null,modifier=Modifier.size(16.dp));Spacer(Modifier.width(5.dp));Text("Očisti prikaz")}
-   }
-   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp),verticalAlignment=Alignment.CenterVertically){
-    Text("CTRL",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-    listOf("ESC" to "\u001b","TAB" to "\t","CTRL+C" to "\u0003","CTRL+D" to "\u0004").forEach{(label,sequence)->
-     FilledTonalButton(onClick={console.send(sequence)},enabled=connected,modifier=Modifier.weight(1f).height(38.dp),contentPadding=PaddingValues(horizontal=3.dp,vertical=0.dp)){Text(label,style=MaterialTheme.typography.labelSmall,maxLines=1)}
+
+    LaunchedEffect(vm){ connect() }
+
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner,vm){
+        val observer=androidx.lifecycle.LifecycleEventObserver{_,event->
+            when(event){
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> if(!connected) connect()
+                androidx.lifecycle.Lifecycle.Event.ON_STOP -> consolePrefs.edit().putString(stateKey,latestOutput.takeLast(30000)).apply()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose{
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            consolePrefs.edit().putString(stateKey,latestOutput.takeLast(30000)).apply()
+            console.close()
+        }
     }
-   }
-   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.Center,verticalAlignment=Alignment.CenterVertically){
-    FilledTonalButton(onClick={console.send("\u001b[D")},enabled=connected,modifier=Modifier.size(width=58.dp,height=40.dp),contentPadding=PaddingValues(0.dp)){Text("←",style=MaterialTheme.typography.titleLarge)}
-    Spacer(Modifier.width(6.dp))
-    Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
-     FilledTonalButton(onClick={console.send("\u001b[A")},enabled=connected,modifier=Modifier.size(width=58.dp,height=40.dp),contentPadding=PaddingValues(0.dp)){Text("↑",style=MaterialTheme.typography.titleLarge)}
-     FilledTonalButton(onClick={console.send("\u001b[B")},enabled=connected,modifier=Modifier.size(width=58.dp,height=40.dp),contentPadding=PaddingValues(0.dp)){Text("↓",style=MaterialTheme.typography.titleLarge)}
+
+    LaunchedEffect(vm, connected){
+        if (connected) {
+            while (true) {
+                delay(15000)
+                if (connected) console.ping()
+            }
+        }
     }
-    Spacer(Modifier.width(6.dp))
-    FilledTonalButton(onClick={console.send("\u001b[C")},enabled=connected,modifier=Modifier.size(width=58.dp,height=40.dp),contentPadding=PaddingValues(0.dp)){Text("→",style=MaterialTheme.typography.titleLarge)}
-   }
-   if(error!=null)Text(error!!,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
-  }
- }
+
+    LaunchedEffect(vm){
+        var retryDelay = 1000L
+        while (true) {
+            delay(retryDelay)
+            if (!connected && !connecting) {
+                connect()
+                retryDelay = (retryDelay * 2).coerceAtMost(15000L)
+            } else if (connected) retryDelay = 1000L
+        }
+    }
+
+    Scaffold(
+        topBar={TopAppBar(
+            title={
+                Column(verticalArrangement=Arrangement.spacedBy(1.dp)){
+                    Text(vm.name, maxLines=1)
+                    Text("KONZOLA · "+vm.node+" · "+vm.vmid,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant,letterSpacing=1.sp)
+                }
+            },
+            navigationIcon={IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,"Natrag")}},
+            actions={
+                Text(if(connected)"● LIVE" else if(connecting)"○ spajanje" else "○ offline",Modifier.padding(end=2.dp),style=MaterialTheme.typography.labelSmall,color=if(connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                IconButton(onClick={connect()},enabled=!connecting){Icon(Icons.Default.Refresh,contentDescription="Ponovno poveži konzolu")}
+                IconButton(onClick={terminalEmulator::clearScreen}){Icon(Icons.Default.DeleteSweep,contentDescription="Očisti terminal")}
+            }
+        )}
+    ){p->
+        Column(Modifier.fillMaxSize().padding(p).padding(horizontal=8.dp, vertical=6.dp), verticalArrangement=Arrangement.spacedBy(7.dp)){
+            Surface(Modifier.fillMaxWidth().weight(1f), color=terminalBg, shape=MaterialTheme.shapes.medium){
+                org.connectbot.terminal.Terminal(
+                    terminalEmulator=terminalEmulator,
+                    modifier=Modifier.fillMaxSize().padding(8.dp),
+                    initialFontSize=13.sp,
+                    minFontSize=8.sp,
+                    maxFontSize=24.sp,
+                    backgroundColor=terminalBg,
+                    foregroundColor=terminalFg,
+                    keyboardEnabled=true,
+                    showSoftKeyboard=true
+                )
+            }
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                OutlinedButton({clipboard.setText(androidx.compose.ui.text.AnnotatedString(latestOutput))},modifier=Modifier.weight(1f)){
+                    Icon(Icons.Default.ContentCopy,null,modifier=Modifier.size(16.dp));Spacer(Modifier.width(5.dp));Text("Kopiraj zapis")
+                }
+                OutlinedButton({terminalEmulator.clearScreen();output=""},modifier=Modifier.weight(1f)){
+                    Icon(Icons.Default.DeleteSweep,null,modifier=Modifier.size(16.dp));Spacer(Modifier.width(5.dp));Text("Očisti terminal")
+                }
+            }
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp),verticalAlignment=Alignment.CenterVertically){
+                listOf("ESC" to "\u001b","TAB" to "\t","CTRL+C" to "\u0003","CTRL+D" to "\u0004","ENTER" to "\r","BACKSPACE" to "\u007f").forEach{(label,sequence)->
+                    FilledTonalButton(onClick={console.send(sequence)},enabled=connected,modifier=Modifier.weight(1f).height(38.dp),contentPadding=PaddingValues(horizontal=2.dp,vertical=0.dp)){Text(label,style=MaterialTheme.typography.labelSmall,maxLines=1)}
+                }
+            }
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.Center,verticalAlignment=Alignment.CenterVertically){
+                FilledTonalButton(onClick={console.send("\u001b[D")},enabled=connected,modifier=Modifier.size(width=58.dp,height=40.dp),contentPadding=PaddingValues(0.dp)){Text("←",style=MaterialTheme.typography.titleLarge)}
+                Spacer(Modifier.width(6.dp))
+                Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
+                    FilledTonalButton(onClick={console.send("\u001b[A")},enabled=connected,modifier=Modifier.size(width=58.dp,height=40.dp),contentPadding=PaddingValues(0.dp)){Text("↑",style=MaterialTheme.typography.titleLarge)}
+                    FilledTonalButton(onClick={console.send("\u001b[B")},enabled=connected,modifier=Modifier.size(width=58.dp,height=40.dp),contentPadding=PaddingValues(0.dp)){Text("↓",style=MaterialTheme.typography.titleLarge)}
+                }
+                Spacer(Modifier.width(6.dp))
+                FilledTonalButton(onClick={console.send("\u001b[C")},enabled=connected,modifier=Modifier.size(width=58.dp,height=40.dp),contentPadding=PaddingValues(0.dp)){Text("→",style=MaterialTheme.typography.titleLarge)}
+            }
+            if(error!=null) Text(error!!,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
+        }
+    }
 }
+
