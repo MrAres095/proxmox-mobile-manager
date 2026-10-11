@@ -2076,13 +2076,11 @@ private fun decodeConsoleText(bytes: ByteArray): String {
  val bel = 7.toChar()
  val cleaned = payload
   .replace(Regex(esc.toString() + "\\][^" + bel + "]*" + bel), "")
-  .replace(Regex(esc.toString() + """\\[[0-?]*[ -/]*[@-~]"""), "")
+  .replace(Regex(esc.toString() + "\\[[0-?]*[ -/]*[@-~]"), "")
   .replace(Regex(esc.toString() + "[@-_]"), "")
   .replace("\\r\\n", "\\n")
   .replace('\\r', '\\n')
- return cleaned.filter { ch ->
-  ch == '\\n' || ch == '\\t' || ch.code >= 32 && ch.code != 127
- }
+ return cleaned.filter { ch -> ch == '\\n' || ch == '\\t' || ch.code >= 32 && ch.code != 127 }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
