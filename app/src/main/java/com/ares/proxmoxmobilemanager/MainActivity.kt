@@ -2257,10 +2257,20 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
     OutlinedButton({output="";error=null},modifier=Modifier.weight(1f)){Icon(Icons.Default.DeleteSweep,null,modifier=Modifier.size(16.dp));Spacer(Modifier.width(5.dp));Text("Očisti prikaz")}
    }
    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp),verticalAlignment=Alignment.CenterVertically){
-    Text("TIPKE",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-    listOf("Ctrl+C" to "\u0003","Ctrl+D" to "\u0004","Tab" to "\t","↑" to "\u001b[A","↓" to "\u001b[B").forEach{(label,sequence)->
-     FilledTonalButton(onClick={console.send(sequence)},enabled=connected,modifier=Modifier.weight(1f).height(38.dp),contentPadding=PaddingValues(horizontal=4.dp,vertical=0.dp)){Text(label,style=MaterialTheme.typography.labelSmall,maxLines=1)}
+    Text("CTRL",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+    listOf("ESC" to "\u001b","TAB" to "\t","CTRL+C" to "\u0003","CTRL+D" to "\u0004").forEach{(label,sequence)->
+     FilledTonalButton(onClick={console.send(sequence)},enabled=connected,modifier=Modifier.weight(1f).height(38.dp),contentPadding=PaddingValues(horizontal=3.dp,vertical=0.dp)){Text(label,style=MaterialTheme.typography.labelSmall,maxLines=1)}
     }
+   }
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.Center,verticalAlignment=Alignment.CenterVertically){
+    FilledTonalButton(onClick={console.send("\u001b[D")},enabled=connected,modifier=Modifier.size(width=58.dp,height=40.dp),contentPadding=PaddingValues(0.dp)){Text("←",style=MaterialTheme.typography.titleLarge)}
+    Spacer(Modifier.width(6.dp))
+    Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
+     FilledTonalButton(onClick={console.send("\u001b[A")},enabled=connected,modifier=Modifier.size(width=58.dp,height=40.dp),contentPadding=PaddingValues(0.dp)){Text("↑",style=MaterialTheme.typography.titleLarge)}
+     FilledTonalButton(onClick={console.send("\u001b[B")},enabled=connected,modifier=Modifier.size(width=58.dp,height=40.dp),contentPadding=PaddingValues(0.dp)){Text("↓",style=MaterialTheme.typography.titleLarge)}
+    }
+    Spacer(Modifier.width(6.dp))
+    FilledTonalButton(onClick={console.send("\u001b[C")},enabled=connected,modifier=Modifier.size(width=58.dp,height=40.dp),contentPadding=PaddingValues(0.dp)){Text("→",style=MaterialTheme.typography.titleLarge)}
    }
    if(error!=null)Text(error!!,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
   }
