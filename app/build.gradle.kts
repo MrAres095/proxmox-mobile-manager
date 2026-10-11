@@ -13,6 +13,12 @@ val releaseVersionName = providers.gradleProperty("APP_VERSION_NAME")
     .orNull
     ?: "0.1.0"
 
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}
+
 android {
     namespace = "com.ares.proxmoxmobilemanager"
     compileSdk = 36
@@ -52,9 +58,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+
 
     buildFeatures {
         compose = true
