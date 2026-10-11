@@ -2075,9 +2075,9 @@ private fun decodeConsoleText(bytes: ByteArray): String {
  // A plain text Compose Text is not a terminal emulator; remove ANSI cursor/color
  // controls and invisible control bytes so shell output stays readable.
  return payload
-  .replace(Regex("\\u001B\\][^\\u0007]*(?:\\u0007|\\u001B\\\\)"), "")
-  .replace(Regex("\\u001B\\[[0-?]*[ -/]*[@-~]"), "")
-  .replace(Regex("\\u001B[@-_]"), "")
+  .replace(Regex("""\u001B\][^\u0007]*(?:\u0007|\u001B\\)"""), "")
+  .replace(Regex("""\u001B\[[0-?]*[ -/]*[@-~]"""), "")
+  .replace(Regex("""\u001B[@-_]"""), "")
   .replace("\\r\\n", "\\n")
   .replace('\\r', '\\n')
   .replace(Regex("[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F]"), "")
