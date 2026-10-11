@@ -2072,15 +2072,38 @@ private fun decodeConsoleText(bytes: ByteArray): String {
  val raw = bytes.toString(Charsets.UTF_8)
  // Proxmox termproxy frames terminal data as: 0:<byte-count>:<payload>.
  val payload = Regex("^0:[0-9]+:").replaceFirst(raw, "")
- val esc = 27.toChar()
- val bel = 7.toChar()
- val cleaned = payload
-  .replace(Regex(esc.toString() + "\\][^" + bel + "]*" + bel), "")
-  .replace(Regex(esc.toString() + "\\[[0-?]*[ -/]*[@-~]"), "")
-  .replace(Regex(esc.toString() + "[@-_]"), "")
-  .replace("\\r\\n", "\\n")
-  .replace('\\r', '\\n')
- return cleaned.filter { ch -> ch == '\\n' || ch == '\\t' || ch.code >= 32 && ch.code != 127 }
+ val out = StringBuilder()
+ var i = 0
+ while (i < payload.length) {
+  val ch = payload[i]
+  if (ch.code == 27) {
+   i++
+   if (i < payload.length && payload[i] == '[') {
+    // CSI control sequence: skip parameters/intermediates and its final byte.
+    i++
+    while (i < payload.length && payload[i].code in 0x20..0x3F) i++
+    if (i < payload.length) i++
+   } else if (i < payload.length && payload[i] == ']') {
+    // OSC title/color sequence, normally terminated by BEL.
+    i++
+    while (i < payload.length && payload[i].code != 7 && payload[i].code != 27) i++
+    if (i < payload.length && payload[i].code == 7) i++
+   } else if (i < payload.length) {
+    i++
+   }
+   continue
+  }
+  when (ch.code) {
+   13 -> {
+    if (i + 1 >= payload.length || payload[i + 1].code != 10) out.append('\n')
+   }
+   10 -> out.append('\n')
+   9 -> out.append('\t')
+   else -> if (ch.code >= 32 && ch.code != 127) out.append(ch)
+  }
+  i++
+ }
+ return out.toString()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
