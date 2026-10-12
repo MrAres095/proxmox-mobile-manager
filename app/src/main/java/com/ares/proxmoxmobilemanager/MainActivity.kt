@@ -2072,16 +2072,26 @@ private fun formatBytes(value: Long): String {
 }
 
 
-private fun decodeTermproxyPayload(bytes: ByteArray): ByteArray? {
-    // Proxmox termproxy uses an ASCII frame header: 0:<byte-count>:<raw terminal bytes>.
-    if (bytes.size < 4 || bytes[0] != '0'.code.toByte() || bytes[1] != ':'.code.toByte()) return null
-    var separator = 2
-    while (separator < bytes.size && bytes[separator] in '0'.code.toByte()..'9'.code.toByte()) separator++
-    if (separator == 2 || separator >= bytes.size || bytes[separator] != ':'.code.toByte()) return null
-    val count = bytes.copyOfRange(2, separator).toString(Charsets.US_ASCII).toIntOrNull() ?: return null
-    val payloadStart = separator + 1
-    if (count < 0 || payloadStart + count > bytes.size) return null
-    return bytes.copyOfRange(payloadStart, payloadStart + count)
+private fun decodeTermproxyPayloads(bytes: ByteArray): List<ByteArray> {
+    // Each termproxy data frame is "0:<byte-count>:<raw bytes>". Parse by byte count,
+    // never by converting terminal bytes to text: UTF-8 and ANSI sequences may cross lines.
+    val payloads = mutableListOf<ByteArray>()
+    var offset = 0
+    while (offset + 3 < bytes.size) {
+        if (bytes[offset] != '0'.code.toByte() || bytes[offset + 1] != ':'.code.toByte()) {
+            // Proxmox may send a short plain-text handshake ("OK") before framed data.
+            break
+        }
+        var separator = offset + 2
+        while (separator < bytes.size && bytes[separator] in '0'.code.toByte()..'9'.code.toByte()) separator++
+        if (separator == offset + 2 || separator >= bytes.size || bytes[separator] != ':'.code.toByte()) break
+        val count = bytes.copyOfRange(offset + 2, separator).toString(Charsets.US_ASCII).toIntOrNull() ?: break
+        val payloadStart = separator + 1
+        if (count < 0 || payloadStart + count > bytes.size) break
+        payloads += bytes.copyOfRange(payloadStart, payloadStart + count)
+        offset = payloadStart + count
+    }
+    return payloads
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -2122,9 +2132,12 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
                     if(message=="OK" || message.trim()=="OK") {
                         connected=true
                     } else {
-                        val payload=decodeTermproxyPayload(b)
-                        if(payload!=null) {
-                            terminalEmulator.writeInput(payload)
+                        val payloads=decodeTermproxyPayloads(b)
+                        if(payloads.isNotEmpty()) {
+                            payloads.forEach { payload ->
+                                terminalEmulator.writeInput(payload)
+                                output=(output+payload.toString(Charsets.UTF_8)).takeLast(30000)
+                            }
                             connected=true
                         } else if(message.startsWith("ERR") || message.contains("authentication failed",true)) {
                             error=message.take(500)
