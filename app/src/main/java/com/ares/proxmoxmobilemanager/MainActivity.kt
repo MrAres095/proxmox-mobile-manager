@@ -1985,17 +1985,25 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 8.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Surface(Modifier.fillMaxWidth().weight(1f), color = terminalBg, shape = MaterialTheme.shapes.medium) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Surface(shape = CircleShape, color = if (connected) androidx.compose.ui.graphics.Color(0xFF123A2B) else MaterialTheme.colorScheme.surfaceVariant) {
+                    Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(7.dp).background(if (connected) androidx.compose.ui.graphics.Color(0xFF35D07F) else MaterialTheme.colorScheme.onSurfaceVariant, CircleShape))
+                        Spacer(Modifier.width(7.dp))
+                        Text(if (connected) "Povezano" else if (connecting) "Spajanje…" else "Nije povezano", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                Text("NODE SHELL", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Surface(Modifier.fillMaxWidth().weight(1f), color = terminalBg, shape = MaterialTheme.shapes.medium, border = androidx.compose.foundation.BorderStroke(1.dp, if (connected) androidx.compose.ui.graphics.Color(0xFF235348) else MaterialTheme.colorScheme.outline)) {
                 org.connectbot.terminal.Terminal(
                     terminalEmulator = terminalEmulator,
                     modifier = Modifier.fillMaxSize().padding(8.dp).focusRequester(terminalFocusRequester),
-                    initialFontSize = 13.sp,
-                    minFontSize = 8.sp,
-                    maxFontSize = 24.sp,
-                    backgroundColor = terminalBg,
-                    foregroundColor = terminalFg,
-                    keyboardEnabled = true,
-                    showSoftKeyboard = true
+                    focusRequester = terminalFocusRequester,
+                    onTerminalTap = { terminalFocusRequester.requestFocus(); keyboardController?.show() },
+                    initialFontSize = 14.sp, minFontSize = 9.sp, maxFontSize = 24.sp,
+                    backgroundColor = terminalBg, foregroundColor = terminalFg, keyboardEnabled = true, showSoftKeyboard = true
                 )
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -2394,45 +2402,38 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
         )}
     ){p->
         Column(Modifier.fillMaxSize().padding(p).padding(horizontal=8.dp, vertical=6.dp), verticalArrangement=Arrangement.spacedBy(7.dp)){
-            Surface(Modifier.fillMaxWidth().weight(1f), color=terminalBg, shape=MaterialTheme.shapes.medium){
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Surface(shape = CircleShape, color = if (connected) androidx.compose.ui.graphics.Color(0xFF123A2B) else MaterialTheme.colorScheme.surfaceVariant) {
+                    Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(7.dp).background(if (connected) androidx.compose.ui.graphics.Color(0xFF35D07F) else MaterialTheme.colorScheme.onSurfaceVariant, CircleShape))
+                        Spacer(Modifier.width(7.dp))
+                        Text(if (connected) "Povezano" else if (connecting) "Spajanje…" else "Nije povezano", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                Text("VMID ${vm.vmid}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Surface(Modifier.fillMaxWidth().weight(1f), color = terminalBg, shape = MaterialTheme.shapes.medium, border = androidx.compose.foundation.BorderStroke(1.dp, if (connected) androidx.compose.ui.graphics.Color(0xFF235348) else MaterialTheme.colorScheme.outline)) {
                 org.connectbot.terminal.Terminal(
-                    terminalEmulator=terminalEmulator,
-                    modifier=Modifier.fillMaxSize().padding(8.dp),
-                    focusRequester=terminalFocusRequester,
-                    onTerminalTap={ terminalFocusRequester.requestFocus(); keyboardController?.show() },
-                    initialFontSize=13.sp,
-                    minFontSize=8.sp,
-                    maxFontSize=24.sp,
-                    backgroundColor=terminalBg,
-                    foregroundColor=terminalFg,
-                    keyboardEnabled=true,
-                    showSoftKeyboard=true
+                    terminalEmulator = terminalEmulator,
+                    modifier = Modifier.fillMaxSize().padding(8.dp).focusRequester(terminalFocusRequester),
+                    focusRequester = terminalFocusRequester,
+                    onTerminalTap = { terminalFocusRequester.requestFocus(); keyboardController?.show() },
+                    initialFontSize = 14.sp, minFontSize = 9.sp, maxFontSize = 24.sp,
+                    backgroundColor = terminalBg, foregroundColor = terminalFg, keyboardEnabled = true, showSoftKeyboard = true
                 )
             }
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                OutlinedButton({clipboard.setText(androidx.compose.ui.text.AnnotatedString(latestOutput))},modifier=Modifier.weight(1f)){
-                    Icon(Icons.Default.ContentCopy,null,modifier=Modifier.size(16.dp));Spacer(Modifier.width(5.dp));Text("Kopiraj zapis")
-                }
-                OutlinedButton({terminalEmulator.clearScreen();output=""},modifier=Modifier.weight(1f)){
-                    Icon(Icons.Default.DeleteSweep,null,modifier=Modifier.size(16.dp));Spacer(Modifier.width(5.dp));Text("Očisti terminal")
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilledTonalButton(onClick = { terminalFocusRequester.requestFocus(); keyboardController?.show() }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Keyboard, null); Spacer(Modifier.width(6.dp)); Text("Tipkovnica") }
+                OutlinedButton(onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(latestOutput)) }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.ContentCopy, null); Spacer(Modifier.width(6.dp)); Text("Kopiraj zapis") }
+                IconButton(onClick = { terminalEmulator.clearScreen(); output = "" }) { Icon(Icons.Default.DeleteSweep, contentDescription = "Očisti terminal") }
+            }
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                listOf("ESC" to "\u001b", "TAB" to "\t", "CTRL+C" to "\u0003", "CTRL+D" to "\u0004", "CTRL+Z" to "\u001a", "CTRL+L" to "\u000c", "CTRL+U" to "\u0015", "CTRL+W" to "\u0017", "↑" to "\u001b[A", "↓" to "\u001b[B", "←" to "\u001b[D", "→" to "\u001b[C", "HOME" to "\u001b[H", "END" to "\u001b[F", "ENTER" to "\r", "BACKSPACE" to "\u007f").forEach { (label, sequence) ->
+                    FilledTonalButton(onClick = { terminalFocusRequester.requestFocus(); console.send(sequence) }, enabled = connected, modifier = Modifier.widthIn(min = 64.dp).height(42.dp), contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)) { Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1) }
                 }
             }
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp),verticalAlignment=Alignment.CenterVertically){
-                listOf("ESC" to "\u001b","TAB" to "\t","CTRL+C" to "\u0003","CTRL+D" to "\u0004","CTRL+O" to "\u000f","CTRL+X" to "\u0018","CTRL+W" to "\u0017","CTRL+K" to "\u000b","CTRL+U" to "\u0015","ENTER" to "\r","BACKSPACE" to "\u007f").forEach{(label,sequence)->
-                    FilledTonalButton(onClick={console.send(sequence)},enabled=connected,modifier=Modifier.weight(1f).height(38.dp),contentPadding=PaddingValues(horizontal=2.dp,vertical=0.dp)){Text(label,style=MaterialTheme.typography.labelSmall,maxLines=1)}
-                }
-            }
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.Center,verticalAlignment=Alignment.CenterVertically){
-                FilledTonalButton(onClick={console.send("\u001b[D")},enabled=connected,modifier=Modifier.size(width=58.dp,height=40.dp),contentPadding=PaddingValues(0.dp)){Text("←",style=MaterialTheme.typography.titleLarge)}
-                Spacer(Modifier.width(6.dp))
-                Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
-                    FilledTonalButton(onClick={console.send("\u001b[A")},enabled=connected,modifier=Modifier.size(width=58.dp,height=40.dp),contentPadding=PaddingValues(0.dp)){Text("↑",style=MaterialTheme.typography.titleLarge)}
-                    FilledTonalButton(onClick={console.send("\u001b[B")},enabled=connected,modifier=Modifier.size(width=58.dp,height=40.dp),contentPadding=PaddingValues(0.dp)){Text("↓",style=MaterialTheme.typography.titleLarge)}
-                }
-                Spacer(Modifier.width(6.dp))
-                FilledTonalButton(onClick={console.send("\u001b[C")},enabled=connected,modifier=Modifier.size(width=58.dp,height=40.dp),contentPadding=PaddingValues(0.dp)){Text("→",style=MaterialTheme.typography.titleLarge)}
-            }
-            if(error!=null) Text(error!!,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
+            if (error != null) { Surface(color = MaterialTheme.colorScheme.errorContainer, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) { Text(error!!, modifier = Modifier.padding(10.dp), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodySmall) } }
         }
     }
 }
