@@ -1965,14 +1965,40 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
                                     }
                                 }
                                 HorizontalDivider()
-                                Text("CPU", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text("${"%.1f".format(node.cpu * 100)}%  •  ${node.maxCpu} jezgri", style = MaterialTheme.typography.titleMedium)
-                                LinearProgressIndicator(progress = { node.cpu.coerceIn(0.0, 1.0).toFloat() }, modifier = Modifier.fillMaxWidth())
-                                Text("RAM", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text("${formatBytes(node.mem)} / ${formatBytes(node.maxMem)}", style = MaterialTheme.typography.titleMedium)
                                 val ramRatio = if (node.maxMem > 0) node.mem.toFloat() / node.maxMem.toFloat() else 0f
-                                LinearProgressIndicator(progress = { ramRatio.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
-                                Text("Vrijeme rada: ${node.uptime}s", style = MaterialTheme.typography.bodyMedium)
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Card(
+                                        Modifier.weight(1f),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                    ) {
+                                        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(Icons.Default.Memory, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                                                Spacer(Modifier.width(6.dp))
+                                                Text("CPU", style = MaterialTheme.typography.labelLarge)
+                                            }
+                                            Text("${"%.1f".format(node.cpu * 100)}%", style = MaterialTheme.typography.headlineSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, maxLines = 1)
+                                            LinearProgressIndicator(progress = { node.cpu.coerceIn(0.0, 1.0).toFloat() }, modifier = Modifier.fillMaxWidth())
+                                            Text("${node.maxCpu} jezgri", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                    Card(
+                                        Modifier.weight(1f),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                    ) {
+                                        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(Icons.Default.Storage, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                                                Spacer(Modifier.width(6.dp))
+                                                Text("RAM", style = MaterialTheme.typography.labelLarge)
+                                            }
+                                            Text("${(ramRatio * 100).toInt()}%", style = MaterialTheme.typography.headlineSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, maxLines = 1)
+                                            LinearProgressIndicator(progress = { ramRatio.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
+                                            Text("${formatBytes(node.mem)} / ${formatBytes(node.maxMem)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                                        }
+                                    }
+                                }
+                                Text("Vrijeme rada: ${node.uptime}s", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
