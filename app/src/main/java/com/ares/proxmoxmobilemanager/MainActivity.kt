@@ -1948,6 +1948,7 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
     val scope = rememberCoroutineScope()
     var tab by remember { mutableStateOf("summary") }
     var logs by remember { mutableStateOf<List<String>>(emptyList()) }
+    var logSearch by remember { mutableStateOf("") }
     var updates by remember { mutableStateOf<List<Pair<String,String>>>(emptyList()) }
     var disks by remember { mutableStateOf<List<String>>(emptyList()) }
     var network by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -2195,15 +2196,44 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
                     contentPadding = PaddingValues(bottom = 20.dp)
                 ) {
                     item {
-                        Text("SISTEMSKI ZAPISI", Modifier.padding(start = 4.dp, top = 4.dp, bottom = 2.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.2.sp)
+                        Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text("SISTEMSKI ZAPISI", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.2.sp)
+                                Text("${logs.size} zapisa učitano", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Icon(Icons.Default.Article, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        }
                     }
-                    items(logs) { logLine ->
-                        Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.Top) {
-                                Icon(Icons.Default.Article, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 2.dp).size(17.dp))
-                                Spacer(Modifier.width(10.dp))
-                                SelectionContainer {
-                                    Text(logLine, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                    item {
+                        OutlinedTextField(
+                            value = logSearch,
+                            onValueChange = { logSearch = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            label = { Text("Pretraži syslog") },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                            trailingIcon = {
+                                if (logSearch.isNotEmpty()) {
+                                    IconButton(onClick = { logSearch = "" }) {
+                                        Icon(Icons.Default.Clear, contentDescription = "Očisti pretragu")
+                                    }
+                                }
+                            }
+                        )
+                    }
+                    if (logs.none { it.contains(logSearch, ignoreCase = true) }) {
+                        item {
+                            EmptyNodeSection(if (logSearch.isBlank()) "Nema syslog zapisa za prikaz." else "Nema zapisa koji odgovaraju pretrazi.")
+                        }
+                    } else {
+                        items(logs.filter { it.contains(logSearch, ignoreCase = true) }) { logLine ->
+                            Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                                Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.Top) {
+                                    Icon(Icons.Default.Article, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 2.dp).size(17.dp))
+                                    Spacer(Modifier.width(10.dp))
+                                    SelectionContainer {
+                                        Text(logLine, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                                    }
                                 }
                             }
                         }
