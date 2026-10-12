@@ -352,8 +352,11 @@ class ProxmoxApi {
                         val size = item.optLong("size", 0L)
                         val allocated = item.optLong("alloc", item.optLong("allocated", 0L))
                         val free = item.optLong("free", 0L)
-                        fun zfsSize(value: Long): String =
-                            if (value > 0L) android.text.format.Formatter.formatFileSize(null, value) else "—"
+                        fun zfsSize(value: Long): String = when {
+                            value <= 0L -> "—"
+                            value >= 1_000_000_000L -> String.format(java.util.Locale.getDefault(), "%.1f GB", value / 1_000_000_000.0)
+                            else -> String.format(java.util.Locale.getDefault(), "%.0f MB", value / 1_000_000.0)
+                        }
                         val capacity = if (size > 0L) " • kapacitet: ${zfsSize(size)}" else ""
                         val used = if (allocated > 0L) " • zauzeto: ${zfsSize(allocated)}" else ""
                         val available = if (free > 0L) " • slobodno: ${zfsSize(free)}" else ""
