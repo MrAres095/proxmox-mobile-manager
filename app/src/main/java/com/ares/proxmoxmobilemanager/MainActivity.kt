@@ -1873,6 +1873,7 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
     val stateKey = remember(base, node.node) { "node_shell_" + base.hashCode() + "_" + node.node }
     var output by remember(stateKey) { mutableStateOf(prefs.getString(stateKey, "") ?: "") }
     val latestOutput by rememberUpdatedState(output)
+    val frameDecoder = remember(base, node.node) { TermproxyFrameDecoder() }
     var connected by remember { mutableStateOf(false) }
     var connecting by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -1901,7 +1902,7 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
                         if (message.trim() == "OK") {
                             connected = true
                         } else {
-                            val payloads = decodeTermproxyPayloads(bytes)
+                            val payloads = frameDecoder.feed(bytes)
                             if (payloads.isNotEmpty()) {
                                 payloads.forEach { payload ->
                                     terminalEmulator.writeInput(payload)
@@ -2261,26 +2262,57 @@ private fun formatBytes(value: Long): String {
 }
 
 
-private fun decodeTermproxyPayloads(bytes: ByteArray): List<ByteArray> {
-    // Each termproxy data frame is "0:<byte-count>:<raw bytes>". Parse by byte count,
-    // never by converting terminal bytes to text: UTF-8 and ANSI sequences may cross lines.
-    val payloads = mutableListOf<ByteArray>()
-    var offset = 0
-    while (offset + 3 < bytes.size) {
-        if (bytes[offset] != '0'.code.toByte() || bytes[offset + 1] != ':'.code.toByte()) {
-            // Proxmox may send a short plain-text handshake ("OK") before framed data.
-            break
+/**
+ * Proxmox termproxy frames are length-prefixed: "0:<byte-count>:<raw bytes>".
+ * WebSocket messages usually contain complete frames, but buffering here also
+ * handles a header or payload split across callbacks without corrupting UTF-8/ANSI data.
+ */
+private class TermproxyFrameDecoder {
+    private var pending = ByteArray(0)
+
+    @Synchronized
+    fun feed(incoming: ByteArray): List<ByteArray> {
+        if (incoming.isEmpty()) return emptyList()
+        // Handshake/error messages are plain text, not termproxy data frames.
+        if (pending.isEmpty() && !(incoming.size >= 2 &&
+                incoming[0] == '0'.code.toByte() && incoming[1] == ':'.code.toByte())) {
+            return emptyList()
         }
-        var separator = offset + 2
-        while (separator < bytes.size && bytes[separator] in '0'.code.toByte()..'9'.code.toByte()) separator++
-        if (separator == offset + 2 || separator >= bytes.size || bytes[separator] != ':'.code.toByte()) break
-        val count = bytes.copyOfRange(offset + 2, separator).toString(Charsets.US_ASCII).toIntOrNull() ?: break
-        val payloadStart = separator + 1
-        if (count < 0 || payloadStart + count > bytes.size) break
-        payloads += bytes.copyOfRange(payloadStart, payloadStart + count)
-        offset = payloadStart + count
+        val bytes = pending + incoming
+        val payloads = mutableListOf<ByteArray>()
+        var offset = 0
+        while (offset < bytes.size) {
+            if (offset + 2 > bytes.size) break
+            if (bytes[offset] != '0'.code.toByte() || bytes[offset + 1] != ':'.code.toByte()) {
+                // Unexpected data: drop stale partial data and let caller handle a plain message.
+                pending = ByteArray(0)
+                return payloads
+            }
+            var separator = offset + 2
+            while (separator < bytes.size &&
+                bytes[separator] in '0'.code.toByte()..'9'.code.toByte()) separator++
+            if (separator == bytes.size) break // header split between callbacks
+            if (separator == offset + 2 || bytes[separator] != ':'.code.toByte()) {
+                pending = ByteArray(0)
+                return payloads
+            }
+            val count = bytes.copyOfRange(offset + 2, separator)
+                .toString(Charsets.US_ASCII).toIntOrNull()
+            if (count == null || count < 0 || count > 4 * 1024 * 1024) {
+                pending = ByteArray(0)
+                return payloads
+            }
+            val payloadStart = separator + 1
+            if (bytes.size - payloadStart < count) break // payload split between callbacks
+            payloads += bytes.copyOfRange(payloadStart, payloadStart + count)
+            offset = payloadStart + count
+        }
+        pending = bytes.copyOfRange(offset, bytes.size)
+        return payloads
     }
-    return payloads
+
+    @Synchronized
+    fun reset() { pending = ByteArray(0) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -2296,6 +2328,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
     val stateKey=remember(base,vm.node,vm.vmid){"console_"+base.hashCode()+"_"+vm.node+"_"+vm.vmid}
     var output by remember(stateKey){mutableStateOf(consolePrefs.getString(stateKey,"")?:"")}
     val latestOutput by rememberUpdatedState(output)
+    val frameDecoder = remember(base, vm.node, vm.vmid) { TermproxyFrameDecoder() }
     var connected by remember{mutableStateOf(false)}
     var connecting by remember{mutableStateOf(false)}
     var error by remember{mutableStateOf<String?>(null)}
@@ -2326,7 +2359,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
                         if(message=="OK" || message.trim()=="OK") {
                             connected=true
                         } else {
-                            val payloads=decodeTermproxyPayloads(b)
+                            val payloads=frameDecoder.feed(b)
                             if(payloads.isNotEmpty()) {
                                 payloads.forEach { payload ->
                                     terminalEmulator.writeInput(payload)
