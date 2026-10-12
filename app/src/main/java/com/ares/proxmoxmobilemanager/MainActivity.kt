@@ -1998,7 +1998,29 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
                                         }
                                     }
                                 }
-                                Text("Vrijeme rada: ${node.uptime}s", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                val uptimeSeconds = node.uptime.toLong().coerceAtLeast(0L)
+                                val uptimeLabel = when {
+                                    uptimeSeconds >= 86400L -> "${uptimeSeconds / 86400L} d ${(uptimeSeconds % 86400L) / 3600L} h"
+                                    uptimeSeconds >= 3600L -> "${uptimeSeconds / 3600L} h ${(uptimeSeconds % 3600L) / 60L} min"
+                                    uptimeSeconds >= 60L -> "${uptimeSeconds / 60L} min ${uptimeSeconds % 60L} s"
+                                    else -> "${uptimeSeconds} s"
+                                }
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = MaterialTheme.shapes.medium
+                                ) {
+                                    Row(
+                                        Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.AccessTime, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Vrijeme rada", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Spacer(Modifier.weight(1f))
+                                        Text(uptimeLabel, style = MaterialTheme.typography.titleSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                                    }
+                                }
                             }
                         }
                     }
