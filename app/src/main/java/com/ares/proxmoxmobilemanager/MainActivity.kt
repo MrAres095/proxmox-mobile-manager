@@ -328,6 +328,12 @@ private fun ConnectionScreen(
         return ProxmoxConnection(endpoint, remote.trim().trimEnd('/'), username.trim(), password, tokenId.trim(), secret.trim())
     }
 
+    val connectionInputValid = if (remoteMode) {
+        remote.trim().startsWith("https://", ignoreCase = true) && remote.trim().removePrefix("https://").isNotBlank()
+    } else {
+        local.trim().isNotBlank() && (localPort.toIntOrNull()?.let { it >= 1 && it <= 65535 } == true)
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -350,7 +356,7 @@ private fun ConnectionScreen(
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedButton(
                         onClick = { if (profileName.isNotBlank() && (local.isNotBlank() || remote.isNotBlank())) onSaveProfile(profileName.trim(), buildConnection()) },
-                        enabled = !loading && profileName.isNotBlank() && (local.isNotBlank() || remote.isNotBlank()),
+                        enabled = !loading && profileName.isNotBlank() && connectionInputValid,
                         modifier = Modifier.weight(0.9f).height(52.dp)
                     ) {
                         Icon(Icons.Default.Save, contentDescription = null)
@@ -359,7 +365,7 @@ private fun ConnectionScreen(
                     }
                     Button(
                         onClick = { onConnect(profileName.ifBlank { "Proxmox" }.trim(), buildConnection()) },
-                        enabled = !loading && (local.isNotBlank() || remote.isNotBlank()),
+                        enabled = !loading && connectionInputValid,
                         modifier = Modifier.weight(1.3f).height(52.dp)
                     ) {
                         if (loading) CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
@@ -484,6 +490,9 @@ private fun ConnectionScreen(
                             label = { Text("IP adresa ili hostname") }, placeholder = { Text("192.168.1.37") }, singleLine = true,
                             leadingIcon = { Icon(Icons.Default.Router, contentDescription = null) }
                         )
+                        if (localPort.isNotBlank() && localPort.toIntOrNull()?.let { it < 1 || it > 65535 } == true) {
+                            Text("Port mora biti broj između 1 i 65535.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        }
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
                             OutlinedTextField(
                                 value = localPort, onValueChange = { localPort = it.filter(Char::isDigit).take(5) },
@@ -515,6 +524,9 @@ private fun ConnectionScreen(
                             trailingIcon = { IconButton(onClick = { showPassword = !showPassword }) { Icon(if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility, contentDescription = "Prikaži ili sakrij token") } }
                         )
                         Text("Za udaljeni pristup koristi HTTPS i API token s ograničenim dozvolama. Nemoj izlagati Proxmox sučelje javno bez odgovarajuće zaštite.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (remote.isNotBlank() && !remote.trim().startsWith("https://", ignoreCase = true)) {
+                            Text("Udaljena adresa mora počinjati s https://.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
             }
