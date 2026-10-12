@@ -845,6 +845,21 @@ private fun Dashboard(
             if (selectedTab == "overview") {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(Triple("guests", "Guestovi", Icons.Default.Dns), Triple("nodes", "Nodeovi", Icons.Default.Computer), Triple("storage", "Pohrana", Icons.Default.Storage)).forEach { (target, label, icon) ->
+                            FilledTonalButton(
+                                onClick = { selectedTab = target },
+                                modifier = Modifier.weight(1f).heightIn(min = 54.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                                }
+                            }
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("PREGLED SUSTAVA", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.6.sp)
                         Spacer(Modifier.weight(1f))
@@ -1214,6 +1229,46 @@ private fun Dashboard(
             }
 
             if (selectedTab == "nodes") {
+            item {
+                Card(
+                    Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text("INFRASTRUKTURA", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.5.sp)
+                                Text("Proxmox nodeovi", style = MaterialTheme.typography.headlineSmall)
+                                Text("Stanje, opterećenje i administracija svakog čvora.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)) {
+                                Icon(Icons.Default.Dns, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(12.dp).size(26.dp))
+                            }
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Surface(Modifier.weight(1f), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
+                                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Text("ONLINE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("\${nodes.count { it.status.equals("online", true) }}", style = MaterialTheme.typography.headlineMedium, color = androidx.compose.ui.graphics.Color(0xFF35D07F))
+                                }
+                            }
+                            Surface(Modifier.weight(1f), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
+                                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Text("OFFLINE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("\${nodes.count { !it.status.equals("online", true) }}", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                            Surface(Modifier.weight(1f), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
+                                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Text("UKUPNO", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("\${nodes.size}", style = MaterialTheme.typography.headlineMedium)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             if (loading) {
                 item {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
@@ -2185,6 +2240,9 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedButton({ clipboard.setText(androidx.compose.ui.text.AnnotatedString(latestOutput)) }, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("Kopiraj zapis")
+                }
+                OutlinedButton({ clipboard.getText()?.text?.let { if (it.isNotEmpty()) console.send(it) } }, enabled = connected && !clipboard.getText()?.text.isNullOrEmpty(), modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Default.ContentPaste, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("Zalijepi")
                 }
                 OutlinedButton({ terminalEmulator.clearScreen(); output = "" }, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.DeleteSweep, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("Očisti terminal")
