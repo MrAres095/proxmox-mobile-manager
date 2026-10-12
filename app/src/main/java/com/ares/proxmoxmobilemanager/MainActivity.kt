@@ -2371,7 +2371,101 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
                         }
                     }
                 }
-                "updates" -> if (updates.isEmpty() && !busy) EmptyNodeSection("Nema dostupnih nadogradnji ili korisnik nema potrebne dozvole.") else LazyColumn(Modifier.fillMaxSize().padding(12.dp)) { items(updates) { Text("${it.first}  ${it.second}", Modifier.fillMaxWidth().padding(vertical = 8.dp)); HorizontalDivider() } }
+                "updates" -> {
+                    if (updates.isEmpty() && !busy) {
+                        EmptyNodeSection("Node je ažuran ili korisnik nema potrebne dozvole za pregled nadogradnji.")
+                    } else {
+                        LazyColumn(
+                            Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            contentPadding = PaddingValues(bottom = 24.dp)
+                        ) {
+                            item {
+                                Card(
+                                    Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                                ) {
+                                    Row(
+                                        Modifier.fillMaxWidth().padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        Surface(
+                                            modifier = Modifier.size(46.dp),
+                                            shape = MaterialTheme.shapes.medium,
+                                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(25.dp))
+                                            }
+                                        }
+                                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                            Text("Nadogradnje paketa", style = MaterialTheme.typography.titleMedium)
+                                            Text(
+                                                if (updates.isEmpty()) "Provjera paketa" else "${updates.size} dostupnih paketa",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        IconButton(onClick = { loadSelectedTab() }, enabled = !busy) {
+                                            Icon(Icons.Default.Refresh, contentDescription = "Provjeri nadogradnje")
+                                        }
+                                    }
+                                }
+                            }
+                            if (updates.isNotEmpty()) {
+                                item {
+                                    Text(
+                                        "DOSTUPNI PAKETI",
+                                        Modifier.padding(start = 4.dp, top = 4.dp),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        letterSpacing = 1.1.sp
+                                    )
+                                }
+                                items(updates) { update ->
+                                    Card(
+                                        Modifier.fillMaxWidth(),
+                                        shape = MaterialTheme.shapes.large,
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                    ) {
+                                        Row(
+                                            Modifier.fillMaxWidth().padding(14.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            Surface(
+                                                modifier = Modifier.size(40.dp),
+                                                shape = MaterialTheme.shapes.medium,
+                                                color = MaterialTheme.colorScheme.secondaryContainer
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(Icons.Default.Inventory2, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                                                }
+                                            }
+                                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                                Text(update.first.ifBlank { "Nepoznat paket" }, style = MaterialTheme.typography.titleSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                                                Text("Dostupna verzija", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                            Surface(
+                                                shape = MaterialTheme.shapes.medium,
+                                                color = MaterialTheme.colorScheme.tertiaryContainer
+                                            ) {
+                                                Text(
+                                                    update.second.ifBlank { "—" },
+                                                    Modifier.widthIn(max = 132.dp).padding(horizontal = 10.dp, vertical = 7.dp),
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                                    maxLines = 2
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
