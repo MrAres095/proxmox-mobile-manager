@@ -1038,30 +1038,6 @@ private fun Dashboard(
                 }
             }
             item { Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { Text("Replication", style = MaterialTheme.typography.titleLarge); Spacer(Modifier.height(6.dp)); Text("Pregled Proxmox replication jobova između nodeova."); Spacer(Modifier.height(10.dp)); Button(onClick = onReplication, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Sync, contentDescription = null); Spacer(Modifier.width(6.dp)); Text("Otvori Replication") } } } }
-            item {
-                Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.extraLarge) {
-                    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.13f)) {
-                            Icon(Icons.Default.AddToQueue, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(10.dp).size(26.dp))
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Text("Novi resurs", style = MaterialTheme.typography.titleMedium)
-                            Text("Kreiraj VM ili LXC izravno na Proxmox nodeu.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Button(onClick = {
-                            createGuestNode = nodes.firstOrNull { it.status.equals("online", true) }?.node ?: nodes.firstOrNull()?.node.orEmpty()
-                            createGuestStorage = storage.firstOrNull { it.active && it.enabled && it.node == createGuestNode && (it.content.contains("images") || it.content.contains("rootdir")) }?.storage
-                                ?: storage.firstOrNull { it.active && it.enabled }?.storage.orEmpty()
-                            createGuestOpen = true
-                        }, enabled = nodes.any { it.status.equals("online", true) } && storage.any { it.active && it.enabled }) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(Modifier.width(5.dp))
-                            Text("Kreiraj")
-                        }
-                    }
-                }
-            }
             }
 
             if (selectedTab == "guests") {
@@ -1073,6 +1049,17 @@ private fun Dashboard(
                     }
                     Surface(shape = CircleShape, color = androidx.compose.ui.graphics.Color(0xFF17343B)) {
                         Text("${vms.size}", modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
+                    }
+                    IconButton(
+                        onClick = {
+                            createGuestNode = nodes.firstOrNull { it.status.equals("online", true) }?.node ?: nodes.firstOrNull()?.node.orEmpty()
+                            createGuestStorage = storage.firstOrNull { it.active && it.enabled && it.node == createGuestNode && (it.content.contains("images") || it.content.contains("rootdir")) }?.storage
+                                ?: storage.firstOrNull { it.active && it.enabled }?.storage.orEmpty()
+                            createGuestOpen = true
+                        },
+                        enabled = nodes.any { it.status.equals("online", true) } && storage.any { it.active && it.enabled }
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Kreiraj novi VM ili LXC")
                     }
                 }
                 Spacer(Modifier.height(4.dp))
