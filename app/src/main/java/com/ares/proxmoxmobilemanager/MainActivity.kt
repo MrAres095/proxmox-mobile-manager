@@ -823,7 +823,7 @@ private fun Dashboard(
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(selected = selectedTab == "overview", onClick = { selectedTab = "overview" }, icon = { Icon(Icons.Default.Dashboard, null) }, label = { Text("Pregled") })
-                NavigationBarItem(selected = selectedTab == "guests", onClick = { selectedTab = "guests" }, icon = { Icon(Icons.Default.Dns, null) }, label = { Text("VM / LXC") })
+                NavigationBarItem(selected = selectedTab == "guests", onClick = { selectedTab = "guests" }, icon = { Icon(Icons.Default.Dns, null) }, label = { Text("Guestovi") })
                 NavigationBarItem(selected = selectedTab == "storage", onClick = { selectedTab = "storage" }, icon = { Icon(Icons.Default.Storage, null) }, label = { Text("Storage") })
                 NavigationBarItem(selected = selectedTab == "nodes", onClick = { selectedTab = "nodes" }, icon = { Icon(Icons.Default.Computer, null) }, label = { Text("Nodeovi") })
             }
@@ -1065,8 +1065,8 @@ private fun Dashboard(
             item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text("RESURSI", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                        Text("Virtualne mašine i LXC", style = MaterialTheme.typography.headlineSmall)
+                        Text("GUESTOVI", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                        Text("Guestovi", style = MaterialTheme.typography.headlineSmall)
                     }
                     Surface(shape = CircleShape, color = androidx.compose.ui.graphics.Color(0xFF17343B)) {
                         Text("${vms.size}", modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
@@ -1089,7 +1089,7 @@ private fun Dashboard(
                     onValueChange = { resourceQuery = it },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    label = { Text("Traži VM/LXC") },
+                    label = { Text("Traži guestove") },
                     placeholder = { Text("Naziv, VMID ili node") },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     trailingIcon = { if (resourceQuery.isNotEmpty()) IconButton(onClick = { resourceQuery = "" }) { Icon(Icons.Default.Close, contentDescription = "Očisti pretragu") } }
@@ -1199,8 +1199,8 @@ private fun Dashboard(
                 })
                 }
             }
-            if (!vmLoading && vms.isEmpty()) item { Text("Nema pronađenih VM/LXC resursa.") }
-            else if (!vmLoading && filteredVms.isEmpty()) item { Text("Nema VM/LXC resursa koji odgovaraju pretrazi i odabranom filtru.") }
+            if (!vmLoading && vms.isEmpty()) item { Text("Nema pronađenih guestova (VM/LXC).") }
+            else if (!vmLoading && filteredVms.isEmpty()) item { Text("Nijedan guest ne odgovara pretrazi i odabranom filtru.") }
 
             }
 
