@@ -963,6 +963,83 @@ private fun Dashboard(
                 }
             }
 
+            item {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("INFRASTRUKTURA", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.4.sp)
+                        Text("Nodeovi", style = MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                    }
+                    TextButton(onClick = { selectedTab = "nodes" }) {
+                        Text("Svi nodeovi")
+                        Icon(Icons.Default.ChevronRight, contentDescription = null)
+                    }
+                }
+                if (nodes.isEmpty()) {
+                    Card(Modifier.fillMaxWidth()) {
+                        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.width(10.dp))
+                            Text("Nema učitanih nodeova. Osvježi pregled ili provjeri vezu sa serverom.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        nodes.forEach { nodeItem ->
+                            val online = nodeItem.status.equals("online", true)
+                            val ramPercent = if (nodeItem.maxMem > 0L) (nodeItem.mem.toDouble() / nodeItem.maxMem.toDouble() * 100.0).toInt().coerceIn(0, 100) else 0
+                            Card(
+                                modifier = Modifier.fillMaxWidth().clickable { onNodeOpen(nodeItem) },
+                                shape = MaterialTheme.shapes.large,
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                        Surface(
+                                            modifier = Modifier.size(40.dp),
+                                            shape = MaterialTheme.shapes.medium,
+                                            color = if (online) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(Icons.Default.Computer, contentDescription = null, tint = if (online) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer)
+                                            }
+                                        }
+                                        Spacer(Modifier.width(10.dp))
+                                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                            Text(nodeItem.node, style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                                            Text(if (online) "Dostupan" else "Nedostupan", style = MaterialTheme.typography.bodySmall, color = if (online) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                                        }
+                                        Surface(shape = CircleShape, color = if (online) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.error.copy(alpha = 0.12f)) {
+                                            Text(if (online) "ONLINE" else "OFFLINE", Modifier.padding(horizontal = 9.dp, vertical = 5.dp), style = MaterialTheme.typography.labelSmall, color = if (online) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                                        }
+                                        Spacer(Modifier.width(4.dp))
+                                        Icon(Icons.Default.ChevronRight, contentDescription = "Otvori node", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text("CPU", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                Spacer(Modifier.weight(1f))
+                                                Text("${(nodeItem.cpu * 100.0).toInt().coerceIn(0, 100)}%", style = MaterialTheme.typography.labelLarge)
+                                            }
+                                            LinearProgressIndicator(progress = { (nodeItem.cpu * 100.0).toFloat().coerceIn(0f, 100f) / 100f }, modifier = Modifier.fillMaxWidth().height(5.dp))
+                                        }
+                                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text("RAM", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                Spacer(Modifier.weight(1f))
+                                                Text("$ramPercent%", style = MaterialTheme.typography.labelLarge)
+                                            }
+                                            LinearProgressIndicator(progress = { ramPercent / 100f }, modifier = Modifier.fillMaxWidth().height(5.dp), color = MaterialTheme.colorScheme.secondary)
+                                        }
+                                    }
+                                    Text("${formatBytes(nodeItem.mem)} / ${formatBytes(nodeItem.maxMem)} RAM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             if (update != null) {
                 item {
                     Card(Modifier.fillMaxWidth()) {
