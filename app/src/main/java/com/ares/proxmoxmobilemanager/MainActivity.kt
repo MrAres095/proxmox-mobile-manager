@@ -2199,6 +2199,7 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
     var connected by remember { mutableStateOf(false) }
     var connecting by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var ctrlModifierActive by remember { mutableStateOf(false) }
     val terminalBg = androidx.compose.ui.graphics.Color(0xFF020506)
     val terminalFg = androidx.compose.ui.graphics.Color(0xFFD6F4E1)
     val terminalEmulator = remember(base, node.node) {
@@ -2207,7 +2208,20 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
             initialCols = 100,
             defaultForeground = terminalFg,
             defaultBackground = terminalBg,
-            onKeyboardInput = { bytes -> console.send(bytes.toString(Charsets.UTF_8)) },
+            onKeyboardInput = { bytes ->
+                val input = bytes.toString(Charsets.UTF_8)
+                if (ctrlModifierActive) {
+                    val character = input.singleOrNull()
+                    if (character != null && character.isLetter() && character.code < 128) {
+                        console.send((character.uppercaseChar().code - 64).toChar().toString())
+                    } else {
+                        console.send(input)
+                    }
+                    ctrlModifierActive = false
+                } else {
+                    console.send(input)
+                }
+            },
             onResize = { dimensions -> console.resize(dimensions.columns, dimensions.rows) }
         )
     }
@@ -2355,9 +2369,19 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                listOf("ESC" to "\u001b", "TAB" to "\t", "CTRL" to "\u0001", "CTRL+C" to "\u0003", "CTRL+D" to "\u0004", "CTRL+Z" to "\u001a", "CTRL+L" to "\u000c", "ALT" to "\u001b", "↑" to "\u001b[A", "↓" to "\u001b[B", "←" to "\u001b[D", "→" to "\u001b[C", "HOME" to "\u001b[H", "END" to "\u001b[F", "PGUP" to "\u001b[5~", "PGDN" to "\u001b[6~", "ENTER" to "\r", "BACKSPACE" to "\u007f").forEach { (label, sequence) ->
+                FilledTonalButton(
+                    onClick = { ctrlModifierActive = !ctrlModifierActive; terminalFocusRequester.requestFocus(); keyboardController?.show() },
+                    enabled = connected,
+                    colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
+                        containerColor = if (ctrlModifierActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = if (ctrlModifierActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
+                    ),
+                    modifier = Modifier.height(42.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp)
+                ) { Text(if (ctrlModifierActive) "CTRL ✓" else "CTRL", style = MaterialTheme.typography.labelMedium) }
+                listOf("ESC" to "\u001b", "TAB" to "\t", "ALT" to "\u001b", "↑" to "\u001b[A", "↓" to "\u001b[B", "←" to "\u001b[D", "→" to "\u001b[C", "HOME" to "\u001b[H", "END" to "\u001b[F", "PGUP" to "\u001b[5~", "PGDN" to "\u001b[6~", "ENTER" to "\r", "BACKSPACE" to "\u007f").forEach { (label, sequence) ->
                     FilledTonalButton(
-                        onClick = { console.send(sequence) },
+                        onClick = { ctrlModifierActive = false; console.send(sequence) },
                         enabled = connected,
                         modifier = Modifier.widthIn(min = 66.dp).height(42.dp),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
@@ -2657,6 +2681,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
     var connected by remember{mutableStateOf(false)}
     var connecting by remember{mutableStateOf(false)}
     var error by remember{mutableStateOf<String?>(null)}
+    var ctrlModifierActive by remember{mutableStateOf(false)}
     val terminalBg=androidx.compose.ui.graphics.Color(0xFF020506)
     val terminalFg=androidx.compose.ui.graphics.Color(0xFFD6F4E1)
     val terminalEmulator = remember(base, vm.node, vm.vmid) {
@@ -2665,7 +2690,20 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
             initialCols = 100,
             defaultForeground = terminalFg,
             defaultBackground = terminalBg,
-            onKeyboardInput = { bytes -> console.send(bytes.toString(Charsets.UTF_8)) },
+            onKeyboardInput = { bytes ->
+                val input = bytes.toString(Charsets.UTF_8)
+                if (ctrlModifierActive) {
+                    val character = input.singleOrNull()
+                    if (character != null && character.isLetter() && character.code < 128) {
+                        console.send((character.uppercaseChar().code - 64).toChar().toString())
+                    } else {
+                        console.send(input)
+                    }
+                    ctrlModifierActive = false
+                } else {
+                    console.send(input)
+                }
+            },
             onResize = { dimensions -> console.resize(dimensions.columns, dimensions.rows) }
         )
     }
@@ -2803,8 +2841,18 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
                 IconButton(onClick = { terminalEmulator.clearScreen(); output = "" }) { Icon(Icons.Default.DeleteSweep, contentDescription = "Očisti terminal") }
             }
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                listOf("ESC" to "\u001b", "TAB" to "\t", "CTRL+C" to "\u0003", "CTRL+D" to "\u0004", "CTRL+Z" to "\u001a", "CTRL+L" to "\u000c", "CTRL+U" to "\u0015", "CTRL+W" to "\u0017", "↑" to "\u001b[A", "↓" to "\u001b[B", "←" to "\u001b[D", "→" to "\u001b[C", "HOME" to "\u001b[H", "END" to "\u001b[F", "ENTER" to "\r", "BACKSPACE" to "\u007f").forEach { (label, sequence) ->
-                    FilledTonalButton(onClick = { terminalFocusRequester.requestFocus(); console.send(sequence) }, enabled = connected, modifier = Modifier.widthIn(min = 64.dp).height(42.dp), contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)) { Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1) }
+                FilledTonalButton(
+                    onClick = { ctrlModifierActive = !ctrlModifierActive; terminalFocusRequester.requestFocus(); keyboardController?.show() },
+                    enabled = connected,
+                    colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
+                        containerColor = if (ctrlModifierActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = if (ctrlModifierActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
+                    ),
+                    modifier = Modifier.height(42.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp)
+                ) { Text(if (ctrlModifierActive) "CTRL ✓" else "CTRL", style = MaterialTheme.typography.labelMedium) }
+                listOf("ESC" to "\u001b", "TAB" to "\t", "↑" to "\u001b[A", "↓" to "\u001b[B", "←" to "\u001b[D", "→" to "\u001b[C", "HOME" to "\u001b[H", "END" to "\u001b[F", "ENTER" to "\r", "BACKSPACE" to "\u007f").forEach { (label, sequence) ->
+                    FilledTonalButton(onClick = { ctrlModifierActive = false; terminalFocusRequester.requestFocus(); console.send(sequence) }, enabled = connected, modifier = Modifier.widthIn(min = 64.dp).height(42.dp), contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)) { Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1) }
                 }
             }
             if (error != null) { Surface(color = MaterialTheme.colorScheme.errorContainer, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) { Text(error!!, modifier = Modifier.padding(10.dp), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodySmall) } }
