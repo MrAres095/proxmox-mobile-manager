@@ -1821,6 +1821,8 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
     val scope = rememberCoroutineScope()
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val terminalFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { context.getSharedPreferences("console_state", Context.MODE_PRIVATE) }
     val stateKey = remember(base, node.node) { "node_shell_" + base.hashCode() + "_" + node.node }
@@ -1931,6 +1933,7 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
                 actions = {
                     Text(if (connected) "● LIVE" else if (connecting) "○ spajanje" else "○ offline", Modifier.padding(end = 2.dp), style = MaterialTheme.typography.labelSmall, color = if (connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                     IconButton(onClick = { connect() }, enabled = !connecting) { Icon(Icons.Default.Refresh, contentDescription = "Ponovno poveži shell") }
+                    IconButton(onClick = { terminalFocusRequester.requestFocus(); keyboardController?.show() }) { Icon(Icons.Default.Keyboard, contentDescription = "Prikaži tipkovnicu") }
                     IconButton(onClick = terminalEmulator::clearScreen) { Icon(Icons.Default.DeleteSweep, contentDescription = "Očisti terminal") }
                 }
             )
@@ -1940,7 +1943,7 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
             Surface(Modifier.fillMaxWidth().weight(1f), color = terminalBg, shape = MaterialTheme.shapes.medium) {
                 org.connectbot.terminal.Terminal(
                     terminalEmulator = terminalEmulator,
-                    modifier = Modifier.fillMaxSize().padding(8.dp),
+                    modifier = Modifier.fillMaxSize().padding(8.dp).focusRequester(terminalFocusRequester),
                     initialFontSize = 13.sp,
                     minFontSize = 8.sp,
                     maxFontSize = 24.sp,
@@ -2223,6 +2226,8 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
     val scope=rememberCoroutineScope()
     val lifecycleOwner=androidx.lifecycle.compose.LocalLifecycleOwner.current
     val clipboard=androidx.compose.ui.platform.LocalClipboardManager.current
+    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val terminalFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
     val context=androidx.compose.ui.platform.LocalContext.current
     val consolePrefs=remember{context.getSharedPreferences("console_state", Context.MODE_PRIVATE)}
     val stateKey=remember(base,vm.node,vm.vmid){"console_"+base.hashCode()+"_"+vm.node+"_"+vm.vmid}
@@ -2332,6 +2337,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
             actions={
                 Text(if(connected)"● LIVE" else if(connecting)"○ spajanje" else "○ offline",Modifier.padding(end=2.dp),style=MaterialTheme.typography.labelSmall,color=if(connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                 IconButton(onClick={connect()},enabled=!connecting){Icon(Icons.Default.Refresh,contentDescription="Ponovno poveži konzolu")}
+                IconButton(onClick={terminalFocusRequester.requestFocus();keyboardController?.show()}){Icon(Icons.Default.Keyboard,contentDescription="Prikaži tipkovnicu")}
                 IconButton(onClick={terminalEmulator::clearScreen}){Icon(Icons.Default.DeleteSweep,contentDescription="Očisti terminal")}
             }
         )}
@@ -2340,7 +2346,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
             Surface(Modifier.fillMaxWidth().weight(1f), color=terminalBg, shape=MaterialTheme.shapes.medium){
                 org.connectbot.terminal.Terminal(
                     terminalEmulator=terminalEmulator,
-                    modifier=Modifier.fillMaxSize().padding(8.dp),
+                    modifier=Modifier.fillMaxSize().padding(8.dp).focusRequester(terminalFocusRequester),
                     initialFontSize=13.sp,
                     minFontSize=8.sp,
                     maxFontSize=24.sp,
