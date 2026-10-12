@@ -2063,15 +2063,70 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
                         HorizontalDivider()
                     }
                 }
-                "tasks" -> if (tasks.isEmpty() && !busy) EmptyNodeSection("Nema zadataka za prikaz ili korisnik nema potrebne dozvole.") else LazyColumn(Modifier.fillMaxSize().padding(12.dp)) {
-                    items(tasks) { task ->
-                        Column(Modifier.fillMaxWidth().clickable { openTaskLog(task) }.padding(vertical = 8.dp)) {
-                            Text(task.type.ifBlank { "Zadatak" } + " • " + (task.status.ifBlank { task.exitStatus.ifBlank { "status nepoznat" } }), style = MaterialTheme.typography.bodyMedium)
-                            Text("Korisnik: " + task.user.ifBlank { "—" }, style = MaterialTheme.typography.bodySmall)
-                            Text("Početak: " + if (task.startTime > 0) java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date(task.startTime * 1000)) else "—", style = MaterialTheme.typography.bodySmall)
-                            Text(task.upid, style = MaterialTheme.typography.labelSmall)
+                "tasks" -> if (tasks.isEmpty() && !busy) EmptyNodeSection("Nema zadataka za prikaz ili korisnik nema potrebne dozvole.") else LazyColumn(
+                    Modifier.fillMaxSize().padding(horizontal = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)
+                ) {
+                    item {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text("POVIJEST ZADATAKA", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.3.sp)
+                                Text("Odaberi zadatak za pregled detaljnog loga.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.secondaryContainer) {
+                                Text("${tasks.size}", Modifier.padding(horizontal = 12.dp, vertical = 7.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                            }
                         }
-                        HorizontalDivider()
+                    }
+                    items(tasks) { task ->
+                        val statusText = task.status.ifBlank { task.exitStatus.ifBlank { "Status nepoznat" } }
+                        val success = statusText.contains("ok", ignoreCase = true) || statusText.contains("success", ignoreCase = true)
+                        val failed = statusText.contains("error", ignoreCase = true) || statusText.contains("fail", ignoreCase = true) || statusText.contains("failed", ignoreCase = true)
+                        val statusColor = if (success) androidx.compose.ui.graphics.Color(0xFF35B879) else if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                        val startedAt = if (task.startTime > 0) java.text.SimpleDateFormat("dd.MM.yyyy • HH:mm", java.util.Locale.getDefault()).format(java.util.Date(task.startTime * 1000)) else "Vrijeme nije dostupno"
+                        Card(
+                            modifier = Modifier.fillMaxWidth().clickable { openTaskLog(task) },
+                            shape = MaterialTheme.shapes.large,
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        ) {
+                            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Surface(
+                                        modifier = Modifier.size(42.dp),
+                                        shape = MaterialTheme.shapes.medium,
+                                        color = statusColor.copy(alpha = 0.13f)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                if (success) Icons.Default.CheckCircle else if (failed) Icons.Default.ErrorOutline else Icons.Default.History,
+                                                contentDescription = null,
+                                                tint = statusColor,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                        }
+                                    }
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        Text(task.type.ifBlank { "Zadatak Proxmoxa" }, style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                                        Text("Korisnik: " + task.user.ifBlank { "—" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Surface(shape = MaterialTheme.shapes.small, color = statusColor.copy(alpha = 0.13f)) {
+                                        Text(statusText, Modifier.padding(horizontal = 9.dp, vertical = 5.dp), style = MaterialTheme.typography.labelSmall, color = statusColor, maxLines = 1)
+                                    }
+                                }
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(startedAt, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Text(task.upid, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                                    Text("Pregledaj log", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                                    Spacer(Modifier.width(4.dp))
+                                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
                     }
                 }
                 "updates" -> if (updates.isEmpty() && !busy) EmptyNodeSection("Nema dostupnih nadogradnji ili korisnik nema potrebne dozvole.") else LazyColumn(Modifier.fillMaxSize().padding(12.dp)) { items(updates) { Text("${it.first}  ${it.second}", Modifier.fillMaxWidth().padding(vertical = 8.dp)); HorizontalDivider() } }
