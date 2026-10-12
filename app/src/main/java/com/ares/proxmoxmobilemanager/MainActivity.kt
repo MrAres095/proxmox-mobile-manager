@@ -1950,6 +1950,7 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
     var logs by remember { mutableStateOf<List<String>>(emptyList()) }
     var logSearch by remember { mutableStateOf("") }
     var diskSearch by remember { mutableStateOf("") }
+    var diskTypeFilter by remember { mutableStateOf("all") }
     var networkSearch by remember { mutableStateOf("") }
     var updates by remember { mutableStateOf<List<Pair<String,String>>>(emptyList()) }
     var disks by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -1963,6 +1964,12 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var confirmNodeAction by remember { mutableStateOf<String?>(null) }
+
+    fun matchesDiskType(line: String): Boolean = when (diskTypeFilter) {
+        "zfs" -> line.startsWith("ZFS POOL", ignoreCase = true)
+        "physical" -> line.startsWith("FIZIČKI DISK", ignoreCase = true)
+        else -> true
+    }
 
     fun loadSelectedTab() {
         busy = true
@@ -2261,7 +2268,7 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
                             onValueChange = { diskSearch = it },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
-                            label = { Text("Pretraži diskove") },
+                            label = { Text("Pretraži diskove i ZFS poolove") },
                             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                             trailingIcon = {
                                 if (diskSearch.isNotEmpty()) IconButton(onClick = { diskSearch = "" }) {
@@ -2269,11 +2276,40 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
                                 }
                             }
                         )
+                        Row(
+                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = diskTypeFilter == "all",
+                                onClick = { diskTypeFilter = "all" },
+                                label = { Text("Sve (\${disks.size})") }
+                            )
+                            FilterChip(
+                                selected = diskTypeFilter == "physical",
+                                onClick = { diskTypeFilter = "physical" },
+                                label = { Text("Fizički diskovi (\${disks.count { it.startsWith("FIZIČKI DISK", ignoreCase = true) }})") }
+                            )
+                            FilterChip(
+                                selected = diskTypeFilter == "zfs",
+                                onClick = { diskTypeFilter = "zfs" },
+                                label = { Text("ZFS poolovi (\${disks.count { it.startsWith("ZFS POOL", ignoreCase = true) }})") }
+                            )
+                        }
                     }
-                    if (disks.none { it.contains(diskSearch, ignoreCase = true) }) {
-                        item { EmptyNodeSection(if (diskSearch.isBlank()) "Nema diskova za prikaz." else "Nema diskova koji odgovaraju pretrazi.") }
+                    if (disks.none { it.contains(diskSearch, ignoreCase = true) && matchesDiskType(it) }) {
+                        item {
+                            EmptyNodeSection(
+                                when {
+                                    disks.isEmpty() -> "Proxmox nije vratio fizičke diskove ni ZFS poolove. Ako je Nextcloud pohrana dataset unutar poola, provjeri i karticu Pohrana."
+                                    diskSearch.isNotBlank() -> "Nema diskova ili ZFS poolova koji odgovaraju pretrazi."
+                                    diskTypeFilter == "zfs" -> "Nema vidljivih ZFS poolova. Dataseti i mount točke mogu biti prikazani u Pohrana ako su registrirani kao Proxmox storage."
+                                    else -> "Nema diskova za prikaz u ovom filtru."
+                                }
+                            )
+                        }
                     } else {
-                        items(disks.filter { it.contains(diskSearch, ignoreCase = true) }) { diskLine ->
+                        items(disks.filter { it.contains(diskSearch, ignoreCase = true) && matchesDiskType(it) }) { diskLine ->
                             Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                                 Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.Top) {
                                     Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(40.dp)) {
