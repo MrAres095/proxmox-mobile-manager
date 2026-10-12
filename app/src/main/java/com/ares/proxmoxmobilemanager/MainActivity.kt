@@ -860,7 +860,6 @@ private fun Dashboard(
                         }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("PREGLED SUSTAVA", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.6.sp)
                         Spacer(Modifier.weight(1f))
                         if (loading || vmLoading) {
@@ -1250,19 +1249,19 @@ private fun Dashboard(
                             Surface(Modifier.weight(1f), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
                                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                     Text("ONLINE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text("\${nodes.count { it.status.equals("online", true) }}", style = MaterialTheme.typography.headlineMedium, color = androidx.compose.ui.graphics.Color(0xFF35D07F))
+                                    Text("${nodes.count { it.status.equals("online", true) }}", style = MaterialTheme.typography.headlineMedium, color = androidx.compose.ui.graphics.Color(0xFF35D07F))
                                 }
                             }
                             Surface(Modifier.weight(1f), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
                                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                     Text("OFFLINE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text("\${nodes.count { !it.status.equals("online", true) }}", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.error)
+                                    Text("${nodes.count { !it.status.equals("online", true) }}", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.error)
                                 }
                             }
                             Surface(Modifier.weight(1f), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
                                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                     Text("UKUPNO", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text("\${nodes.size}", style = MaterialTheme.typography.headlineMedium)
+                                    Text("${nodes.size}", style = MaterialTheme.typography.headlineMedium)
                                 }
                             }
                         }
