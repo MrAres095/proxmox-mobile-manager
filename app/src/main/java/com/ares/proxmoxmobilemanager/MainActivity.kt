@@ -2102,30 +2102,77 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
                         }
                     }
                     item {
-                        Text("Brze radnje", style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.height(8.dp))
-                        Button(onClick = onShell, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Default.Terminal, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Otvori Shell")
+                        Card(
+                            Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.extraLarge,
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        ) {
+                            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(40.dp)) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(Icons.Default.Bolt, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                        }
+                                    }
+                                    Spacer(Modifier.width(10.dp))
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text("Brze radnje", style = MaterialTheme.typography.titleMedium)
+                                        Text("Izravne radnje za ovaj node", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                                Button(onClick = onShell, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = node.status.equals("online", true) && !busy) {
+                                    Icon(Icons.Default.Terminal, contentDescription = null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Otvori terminal / Shell")
+                                    Spacer(Modifier.weight(1f))
+                                    Icon(Icons.Default.ChevronRight, contentDescription = null)
+                                }
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    OutlinedButton(
+                                        onClick = { confirmNodeAction = "reboot" },
+                                        enabled = !busy && node.status.equals("online", true),
+                                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
+                                    ) {
+                                        Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Restart", maxLines = 1)
+                                    }
+                                    OutlinedButton(
+                                        onClick = { confirmNodeAction = "shutdown" },
+                                        enabled = !busy && node.status.equals("online", true),
+                                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                    ) {
+                                        Icon(Icons.Default.PowerSettingsNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Ugasi", maxLines = 1)
+                                    }
+                                }
+                                Surface(color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.55f), shape = MaterialTheme.shapes.medium) {
+                                    Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.Top) {
+                                        Icon(Icons.Default.WarningAmber, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            "Restart ili gašenje prekida rad svih VM-ova i LXC-ova na ovom nodeu.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            }
                         }
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedButton(onClick = { confirmNodeAction = "reboot" }, enabled = !busy && node.status.equals("online", true), modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Default.RestartAlt, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Restartaj node")
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedButton(onClick = { confirmNodeAction = "shutdown" }, enabled = !busy && node.status.equals("online", true), modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Default.PowerSettingsNew, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Ugasi node")
-                        }
-                        Text("Restart ili gašenje prekida rad svih VM-ova i LXC-ova na ovom nodeu.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     item {
-                        Text("Upravljanje nodeom", style = MaterialTheme.typography.titleMedium)
-                        Text("Koristi kartice iznad za syslog, nadogradnje, diskove, mrežu, firewall i povijest zadataka.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text("UPRAVLJANJE", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.2.sp)
+                                Text("Alati za node", style = MaterialTheme.typography.titleMedium)
+                            }
+                            Icon(Icons.Default.Tune, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text("Odaberi kartice na vrhu za syslog, nadogradnje, diskove, mrežu, firewall i povijest zadataka.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 "logs" -> if (logs.isEmpty() && busy) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() } else LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp)) { items(logs) { Text(it, Modifier.fillMaxWidth().padding(vertical = 6.dp), style = MaterialTheme.typography.bodySmall); HorizontalDivider() } }
