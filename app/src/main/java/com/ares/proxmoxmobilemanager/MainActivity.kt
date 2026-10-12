@@ -2189,9 +2189,58 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
                         Text("Odaberi kartice na vrhu za syslog, nadogradnje, diskove, mrežu, firewall i povijest zadataka.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                "logs" -> if (logs.isEmpty() && busy) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() } else LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp)) { items(logs) { Text(it, Modifier.fillMaxWidth().padding(vertical = 6.dp), style = MaterialTheme.typography.bodySmall); HorizontalDivider() } }
-                "disks" -> if (disks.isEmpty() && !busy) EmptyNodeSection("Nema podataka o diskovima ili korisnik nema potrebne dozvole.") else LazyColumn(Modifier.fillMaxSize().padding(12.dp)) { items(disks) { Text(it, Modifier.fillMaxWidth().padding(vertical = 8.dp), style = MaterialTheme.typography.bodySmall); HorizontalDivider() } }
-                "network" -> if (network.isEmpty() && !busy) EmptyNodeSection("Nema mrežnih sučelja ili korisnik nema potrebne dozvole.") else LazyColumn(Modifier.fillMaxSize().padding(12.dp)) { items(network) { Text(it, Modifier.fillMaxWidth().padding(vertical = 8.dp), style = MaterialTheme.typography.bodySmall); HorizontalDivider() } }
+                "logs" -> if (logs.isEmpty() && busy) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() } else if (logs.isEmpty()) EmptyNodeSection("Nema syslog zapisa za prikaz ili korisnik nema potrebne dozvole.") else LazyColumn(
+                    Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 20.dp)
+                ) {
+                    item {
+                        Text("SISTEMSKI ZAPISI", Modifier.padding(start = 4.dp, top = 4.dp, bottom = 2.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.2.sp)
+                    }
+                    items(logs) { logLine ->
+                        Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.Top) {
+                                Icon(Icons.Default.Article, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 2.dp).size(17.dp))
+                                Spacer(Modifier.width(10.dp))
+                                SelectionContainer {
+                                    Text(logLine, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
+                    }
+                }
+                "disks" -> if (disks.isEmpty() && !busy) EmptyNodeSection("Nema podataka o diskovima ili korisnik nema potrebne dozvole.") else LazyColumn(
+                    Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 20.dp)
+                ) {
+                    item { Text("POHRANA NODEA", Modifier.padding(start = 4.dp, top = 4.dp, bottom = 2.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.2.sp) }
+                    items(disks) { diskLine ->
+                        Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                            Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.Top) {
+                                Icon(Icons.Default.Storage, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 2.dp).size(19.dp))
+                                Spacer(Modifier.width(10.dp))
+                                SelectionContainer { Text(diskLine, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium) }
+                            }
+                        }
+                    }
+                }
+                "network" -> if (network.isEmpty() && !busy) EmptyNodeSection("Nema mrežnih sučelja ili korisnik nema potrebne dozvole.") else LazyColumn(
+                    Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 20.dp)
+                ) {
+                    item { Text("MREŽNA SUČELJA", Modifier.padding(start = 4.dp, top = 4.dp, bottom = 2.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.2.sp) }
+                    items(network) { networkLine ->
+                        Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                            Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.Top) {
+                                Icon(Icons.Default.Lan, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 2.dp).size(19.dp))
+                                Spacer(Modifier.width(10.dp))
+                                SelectionContainer { Text(networkLine, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium) }
+                            }
+                        }
+                    }
+                }
                 "firewall" -> if (firewall.isEmpty() && !busy) EmptyNodeSection("Nema pravila node firewalla ili korisnik nema potrebne dozvole.") else LazyColumn(Modifier.fillMaxSize().padding(12.dp)) {
                     items(firewall) { rule ->
                         Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
