@@ -2241,13 +2241,68 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
                         }
                     }
                 }
-                "firewall" -> if (firewall.isEmpty() && !busy) EmptyNodeSection("Nema pravila node firewalla ili korisnik nema potrebne dozvole.") else LazyColumn(Modifier.fillMaxSize().padding(12.dp)) {
-                    items(firewall) { rule ->
-                        Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                            Text("#${rule.pos}  ${rule.action.uppercase()}  •  ${rule.type}  •  ${if (rule.enable) "UKLJUČENO" else "ISKLJUČENO"}", style = MaterialTheme.typography.bodyMedium, color = if (rule.enable) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(listOf(rule.proto.takeIf { it.isNotBlank() }, rule.source.takeIf { it.isNotBlank() }?.let { "izvor: $it" }, rule.dest.takeIf { it.isNotBlank() }?.let { "odredište: $it" }, rule.dport.takeIf { it.isNotBlank() }?.let { "port: $it" }, rule.comment.takeIf { it.isNotBlank() }).filterNotNull().joinToString(" • ").ifBlank { "Bez dodatnih detalja" }, style = MaterialTheme.typography.bodySmall)
+                "firewall" -> if (firewall.isEmpty() && !busy) EmptyNodeSection("Nema pravila node firewalla ili korisnik nema potrebne dozvole.") else LazyColumn(
+                    Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 20.dp)
+                ) {
+                    item {
+                        Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text("SIGURNOSNA PRAVILA", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.2.sp)
+                                Text("Firewall nodea", style = MaterialTheme.typography.titleMedium)
+                            }
+                            Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.secondaryContainer) {
+                                Text("${firewall.size}", Modifier.padding(horizontal = 12.dp, vertical = 7.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                            }
                         }
-                        HorizontalDivider()
+                    }
+                    items(firewall) { rule ->
+                        val enabledColor = if (rule.enable) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        Card(
+                            Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.large,
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Surface(shape = MaterialTheme.shapes.medium, color = enabledColor.copy(alpha = 0.13f), modifier = Modifier.size(40.dp)) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(Icons.Default.Security, contentDescription = null, tint = enabledColor, modifier = Modifier.size(21.dp))
+                                        }
+                                    }
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        Text("Pravilo #${rule.pos}", style = MaterialTheme.typography.titleSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                                        Text(rule.type.ifBlank { "Pravilo firewall" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Surface(shape = MaterialTheme.shapes.small, color = enabledColor.copy(alpha = 0.13f)) {
+                                        Text(if (rule.enable) "AKTIVNO" else "ISKLJUČENO", Modifier.padding(horizontal = 8.dp, vertical = 5.dp), style = MaterialTheme.typography.labelSmall, color = enabledColor)
+                                    }
+                                }
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("Akcija", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(rule.action.uppercase().ifBlank { "—" }, style = MaterialTheme.typography.labelLarge, color = enabledColor)
+                                    Spacer(Modifier.weight(1f))
+                                    rule.proto.takeIf { it.isNotBlank() }?.let { Text("Protokol: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                                }
+                                val details = listOf(
+                                    rule.source.takeIf { it.isNotBlank() }?.let { "Izvor" to it },
+                                    rule.dest.takeIf { it.isNotBlank() }?.let { "Odredište" to it },
+                                    rule.dport.takeIf { it.isNotBlank() }?.let { "Port" to it },
+                                    rule.comment.takeIf { it.isNotBlank() }?.let { "Opis" to it }
+                                ).filterNotNull()
+                                if (details.isNotEmpty()) {
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                    details.forEach { (label, value) ->
+                                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                                            Text(label, modifier = Modifier.width(88.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            SelectionContainer { Text(value, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall) }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 "tasks" -> if (tasks.isEmpty() && !busy) EmptyNodeSection("Nema zadataka za prikaz ili korisnik nema potrebne dozvole.") else LazyColumn(
