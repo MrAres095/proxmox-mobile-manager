@@ -1913,7 +1913,7 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
                                 HorizontalDivider()
                                 Text("CPU", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text("${"%.1f".format(node.cpu * 100)}%  •  ${node.maxCpu} jezgri", style = MaterialTheme.typography.titleMedium)
-                                LinearProgressIndicator(progress = { node.cpu.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
+                                LinearProgressIndicator(progress = { node.cpu.coerceIn(0.0, 1.0).toFloat() }, modifier = Modifier.fillMaxWidth())
                                 Text("RAM", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text("${formatBytes(node.mem)} / ${formatBytes(node.maxMem)}", style = MaterialTheme.typography.titleMedium)
                                 val ramRatio = if (node.maxMem > 0) node.mem.toFloat() / node.maxMem.toFloat() else 0f
