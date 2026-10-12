@@ -1967,14 +1967,14 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                listOf("ESC" to "\u001b", "TAB" to "\t", "CTRL+C" to "\u0003", "CTRL+D" to "\u0004", "CTRL+O" to "\u000f", "CTRL+X" to "\u0018", "CTRL+W" to "\u0017", "CTRL+K" to "\u000b", "CTRL+U" to "\u0015", "ENTER" to "\r", "BACKSPACE" to "\u007f", "CTRL+L" to "\u000c").forEach { (label, sequence) ->
+                listOf("ESC" to "\u001b", "TAB" to "\t", "CTRL" to "\u0001", "CTRL+C" to "\u0003", "CTRL+D" to "\u0004", "CTRL+Z" to "\u001a", "CTRL+L" to "\u000c", "ALT" to "\u001b", "↑" to "\u001b[A", "↓" to "\u001b[B", "←" to "\u001b[D", "→" to "\u001b[C", "HOME" to "\u001b[H", "END" to "\u001b[F", "PGUP" to "\u001b[5~", "PGDN" to "\u001b[6~", "ENTER" to "\r", "BACKSPACE" to "\u007f").forEach { (label, sequence) ->
                     FilledTonalButton(
                         onClick = { console.send(sequence) },
                         enabled = connected,
-                        modifier = Modifier.width(82.dp).height(40.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                        modifier = Modifier.widthIn(min = 66.dp).height(42.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
                     ) {
-                        Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                        Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
                     }
                 }
             }
@@ -2270,6 +2270,12 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
                             connected=true
                         } else if(message.startsWith("ERR") || message.contains("authentication failed",true)) {
                             error=message.take(500)
+                        } else if (b.isNotEmpty() && !message.startsWith("0:")) {
+                            // Some Proxmox/proxy versions deliver terminal bytes without the
+                            // termproxy length envelope. Do not silently discard them.
+                            terminalEmulator.writeInput(b)
+                            output=(output+message).takeLast(30000)
+                            connected=true
                         }
                     }
                 },{reason->
@@ -2347,7 +2353,9 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
             Surface(Modifier.fillMaxWidth().weight(1f), color=terminalBg, shape=MaterialTheme.shapes.medium){
                 org.connectbot.terminal.Terminal(
                     terminalEmulator=terminalEmulator,
-                    modifier=Modifier.fillMaxSize().padding(8.dp).focusRequester(terminalFocusRequester),
+                    modifier=Modifier.fillMaxSize().padding(8.dp),
+                    focusRequester=terminalFocusRequester,
+                    onTerminalTap={ terminalFocusRequester.requestFocus(); keyboardController?.show() },
                     initialFontSize=13.sp,
                     minFontSize=8.sp,
                     maxFontSize=24.sp,
