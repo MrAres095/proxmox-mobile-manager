@@ -322,20 +322,46 @@ class ProxmoxApi {
 
     suspend fun getNodeDisks(base: String, connection: ProxmoxConnection, node: ProxmoxNode): List<String> =
         withContext(Dispatchers.IO) {
-            val path = "/api2/json/nodes/${URLEncoder.encode(node.node, "UTF-8")}/disks/list"
-            val data = request(base, path, connection, 10000).optJSONArray("data") ?: return@withContext emptyList()
-            buildList {
-                for (i in 0 until data.length()) {
-                    val item = data.optJSONObject(i) ?: continue
-                    val path = item.optString("devpath", item.optString("path", "Nepoznat uređaj"))
-                    val model = item.optString("model", "Model nije naveden")
-                    val size = item.optLong("size", 0L)
-                    val sizeText = if (size > 0L) String.format(java.util.Locale.getDefault(), "%.1f GB", size / 1_000_000_000.0) else "Veličina nije dostupna"
-                    val type = item.optString("type", "disk")
-                    val usage = if (item.optBoolean("used")) "U upotrebi" else "Slobodan / neoznačen"
-                    add("$path  •  $model  •  $sizeText  •  $type  •  $usage")
+            val results = mutableListOf<String>()
+            val nodePath = "/api2/json/nodes/${URLEncoder.encode(node.node, "UTF-8")}"
+            try {
+                val data = request(base, "$nodePath/disks/list", connection, 10000).optJSONArray("data")
+                if (data != null) {
+                    for (i in 0 until data.length()) {
+                        val item = data.optJSONObject(i) ?: continue
+                        val path = item.optString("devpath", item.optString("path", "Nepoznat uređaj"))
+                        val model = item.optString("model", "Model nije naveden")
+                        val size = item.optLong("size", 0L)
+                        val sizeText = if (size > 0L) String.format(java.util.Locale.getDefault(), "%.1f GB", size / 1_000_000_000.0) else "Veličina nije dostupna"
+                        val type = item.optString("type", "disk")
+                        val usage = if (item.optBoolean("used")) "U upotrebi" else "Slobodan / neoznačen"
+                        results.add("FIZIČKI DISK • $path  •  $model  •  $sizeText  •  $type  •  $usage")
+                    }
                 }
-            }
+            } catch (_: Exception) { }
+
+            // Proxmox exposes ZFS pools separately from the physical disk inventory.
+            // Keep physical disk results available even when this endpoint is unsupported or permission-denied.
+            try {
+                val data = request(base, "$nodePath/disks/zfs", connection, 10000).optJSONArray("data")
+                if (data != null) {
+                    for (i in 0 until data.length()) {
+                        val item = data.optJSONObject(i) ?: continue
+                        val name = item.optString("name", item.optString("pool", "ZFS pool"))
+                        val health = item.optString("health", item.optString("status", "status nije dostupan"))
+                        val size = item.optLong("size", 0L)
+                        val allocated = item.optLong("alloc", item.optLong("allocated", 0L))
+                        val free = item.optLong("free", 0L)
+                        fun zfsSize(value: Long): String =
+                            if (value > 0L) android.text.format.Formatter.formatFileSize(null, value) else "—"
+                        val capacity = if (size > 0L) " • kapacitet: ${zfsSize(size)}" else ""
+                        val used = if (allocated > 0L) " • zauzeto: ${zfsSize(allocated)}" else ""
+                        val available = if (free > 0L) " • slobodno: ${zfsSize(free)}" else ""
+                        results.add("ZFS POOL • $name • stanje: $health$capacity$used$available")
+                    }
+                }
+            } catch (_: Exception) { }
+            results
         }
 
     suspend fun getNodeNetwork(base: String, connection: ProxmoxConnection, node: ProxmoxNode): List<String> =
