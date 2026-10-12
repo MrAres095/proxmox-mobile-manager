@@ -1112,7 +1112,22 @@ private fun Dashboard(
             if (vmLoading && vms.isEmpty()) {
                 item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() } }
             }
-            items(orderedVms, key = { it.node + "-" + it.type + "-" + it.vmid }) { vm ->
+            orderedVms.groupBy { it.node }.forEach { (nodeName, nodeVms) ->
+                item(key = "resource-node-$nodeName") {
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 5.dp, bottom = 1.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Dns, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(nodeName, style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                        Spacer(Modifier.width(8.dp))
+                        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant) {
+                            Text("${nodeVms.size} resursa", modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+                items(nodeVms, key = { it.node + "-" + it.type + "-" + it.vmid }) { vm ->
                 VmCard(vm, vmLoading, onVmAction, onConsole, onSnapshot, onDelete = { selected -> deleteGuestVm = selected; deleteGuestConfirmation = "" }, onEditConfig = { selected ->
                     editVm = selected
                 }, onSnapshots = { selected ->
@@ -1174,6 +1189,7 @@ private fun Dashboard(
                         }
                     }
                 })
+                }
             }
             if (!vmLoading && vms.isEmpty()) item { Text("Nema pronađenih VM/LXC resursa.") }
             else if (!vmLoading && filteredVms.isEmpty()) item { Text("Nema VM/LXC resursa koji odgovaraju pretrazi i odabranom filtru.") }
