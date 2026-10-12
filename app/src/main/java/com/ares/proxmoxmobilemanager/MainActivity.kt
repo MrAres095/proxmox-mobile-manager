@@ -750,6 +750,7 @@ private fun Dashboard(
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var storageQuery by remember { mutableStateOf("") }
     var storageStatusFilter by remember { mutableStateOf("all") }
+    var selectedTab by remember { mutableStateOf("overview") }
     val filteredVms = vms.filter { vm ->
         val query = resourceQuery.trim()
         val matchesQuery = query.isBlank() || vm.name.contains(query, ignoreCase = true) || vm.vmid.toString().contains(query) || vm.node.contains(query, ignoreCase = true) || vm.type.contains(query, ignoreCase = true)
@@ -818,12 +819,21 @@ private fun Dashboard(
                     IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, contentDescription = "Postavke") }
                 }
             )
+        },
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(selected = selectedTab == "overview", onClick = { selectedTab = "overview" }, icon = { Icon(Icons.Default.Dashboard, null) }, label = { Text("Pregled") })
+                NavigationBarItem(selected = selectedTab == "guests", onClick = { selectedTab = "guests" }, icon = { Icon(Icons.Default.Dns, null) }, label = { Text("VM / LXC") })
+                NavigationBarItem(selected = selectedTab == "storage", onClick = { selectedTab = "storage" }, icon = { Icon(Icons.Default.Storage, null) }, label = { Text("Storage") })
+                NavigationBarItem(selected = selectedTab == "nodes", onClick = { selectedTab = "nodes" }, icon = { Icon(Icons.Default.Computer, null) }, label = { Text("Nodeovi") })
+            }
         }
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(padding).padding(horizontal = 14.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            if (selectedTab == "overview") {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1052,6 +1062,9 @@ private fun Dashboard(
                     }
                 }
             }
+            }
+
+            if (selectedTab == "guests") {
             item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -1165,6 +1178,9 @@ private fun Dashboard(
             if (!vmLoading && vms.isEmpty()) item { Text("Nema pronađenih VM/LXC resursa.") }
             else if (!vmLoading && filteredVms.isEmpty()) item { Text("Nema VM/LXC resursa koji odgovaraju pretrazi i odabranom filtru.") }
 
+            }
+
+            if (selectedTab == "nodes") {
             if (loading) {
                 item {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
@@ -1255,6 +1271,9 @@ private fun Dashboard(
                 }
             }
             if (!loading && nodes.isEmpty()) item { Text("Nema pronađenih nodeova.") }
+            }
+
+            if (selectedTab == "storage") {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text("POHRANA", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
@@ -1355,6 +1374,7 @@ private fun Dashboard(
                         if (s.content.isNotBlank()) Text("Sadržaj: ${s.content}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
+            }
             }
         }
 
