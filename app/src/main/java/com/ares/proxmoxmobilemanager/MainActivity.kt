@@ -1963,7 +1963,7 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                listOf("ESC" to "\u001b", "TAB" to "\t", "CTRL+C" to "\u0003", "CTRL+D" to "\u0004", "ENTER" to "\r", "BACKSPACE" to "\u007f", "CTRL+L" to "\u000c").forEach { (label, sequence) ->
+                listOf("ESC" to "\u001b", "TAB" to "\t", "CTRL+C" to "\u0003", "CTRL+D" to "\u0004", "CTRL+O" to "\u000f", "CTRL+X" to "\u0018", "CTRL+W" to "\u0017", "CTRL+K" to "\u000b", "CTRL+U" to "\u0015", "ENTER" to "\r", "BACKSPACE" to "\u007f", "CTRL+L" to "\u000c").forEach { (label, sequence) ->
                     FilledTonalButton(
                         onClick = { console.send(sequence) },
                         enabled = connected,
@@ -2359,7 +2359,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
                 }
             }
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp),verticalAlignment=Alignment.CenterVertically){
-                listOf("ESC" to "\u001b","TAB" to "\t","CTRL+C" to "\u0003","CTRL+D" to "\u0004","ENTER" to "\r","BACKSPACE" to "\u007f").forEach{(label,sequence)->
+                listOf("ESC" to "\u001b","TAB" to "\t","CTRL+C" to "\u0003","CTRL+D" to "\u0004","CTRL+O" to "\u000f","CTRL+X" to "\u0018","CTRL+W" to "\u0017","CTRL+K" to "\u000b","CTRL+U" to "\u0015","ENTER" to "\r","BACKSPACE" to "\u007f").forEach{(label,sequence)->
                     FilledTonalButton(onClick={console.send(sequence)},enabled=connected,modifier=Modifier.weight(1f).height(38.dp),contentPadding=PaddingValues(horizontal=2.dp,vertical=0.dp)){Text(label,style=MaterialTheme.typography.labelSmall,maxLines=1)}
                 }
             }
