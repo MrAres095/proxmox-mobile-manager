@@ -2283,17 +2283,17 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
                             FilterChip(
                                 selected = diskTypeFilter == "all",
                                 onClick = { diskTypeFilter = "all" },
-                                label = { Text("Sve (\${disks.size})") }
+                                label = { Text("Sve (${disks.size})") }
                             )
                             FilterChip(
                                 selected = diskTypeFilter == "physical",
                                 onClick = { diskTypeFilter = "physical" },
-                                label = { Text("Fizički diskovi (\${disks.count { it.startsWith("FIZIČKI DISK", ignoreCase = true) }})") }
+                                label = { Text("Fizički diskovi (${disks.count { it.startsWith("FIZIČKI DISK", ignoreCase = true) }})") }
                             )
                             FilterChip(
                                 selected = diskTypeFilter == "zfs",
                                 onClick = { diskTypeFilter = "zfs" },
-                                label = { Text("ZFS poolovi (\${disks.count { it.startsWith("ZFS POOL", ignoreCase = true) }})") }
+                                label = { Text("ZFS poolovi (${disks.count { it.startsWith("ZFS POOL", ignoreCase = true) }})") }
                             )
                         }
                     }
