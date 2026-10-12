@@ -883,7 +883,25 @@ private fun Dashboard(
                                     Text("${formatBytes(totalMem)} / ${formatBytes(maxMem)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
-                            if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
+                            if (error != null) {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = MaterialTheme.colorScheme.errorContainer,
+                                    shape = MaterialTheme.shapes.medium
+                                ) {
+                                    Row(
+                                        Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                        Text(error, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodySmall)
+                                        TextButton(onClick = onRefresh, enabled = !loading && !vmLoading) {
+                                            Text("Pokušaj ponovno")
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
