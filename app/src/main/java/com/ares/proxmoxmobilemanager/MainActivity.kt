@@ -1907,9 +1907,18 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
                     Icon(Icons.Default.DeleteSweep, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("Očisti terminal")
                 }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                listOf("ESC" to "\u001b", "TAB" to "\t", "CTRL+C" to "\u0003", "CTRL+D" to "\u0004", "ENTER" to "\r", "BACKSPACE" to "\u007f").forEach { (label, sequence) ->
-                    FilledTonalButton(onClick = { console.send(sequence) }, enabled = connected, modifier = Modifier.weight(1f).height(38.dp), contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                listOf("ESC" to "\u001b", "TAB" to "\t", "CTRL+C" to "\u0003", "CTRL+D" to "\u0004", "ENTER" to "\r", "BACKSPACE" to "\u007f", "CTRL+L" to "\u000c").forEach { (label, sequence) ->
+                    FilledTonalButton(
+                        onClick = { console.send(sequence) },
+                        enabled = connected,
+                        modifier = Modifier.width(82.dp).height(40.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                    ) {
                         Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     }
                 }
