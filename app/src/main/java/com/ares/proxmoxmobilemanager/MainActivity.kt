@@ -770,6 +770,17 @@ private fun Dashboard(
         }
     }
 
+    val apiStatusLabel = when {
+        error != null -> "GREŠKA"
+        loading || vmLoading -> "UČITAVANJE"
+        else -> "API OK"
+    }
+    val apiStatusColor = when {
+        error != null -> MaterialTheme.colorScheme.error
+        loading || vmLoading -> MaterialTheme.colorScheme.tertiary
+        else -> androidx.compose.ui.graphics.Color(0xFF35D07F)
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -824,12 +835,12 @@ private fun Dashboard(
                                 }
                                 Surface(
                                     shape = MaterialTheme.shapes.small,
-                                    color = androidx.compose.ui.graphics.Color(0xFF123A2B)
+                                    color = apiStatusColor.copy(alpha = 0.14f)
                                 ) {
                                     Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Box(Modifier.size(7.dp).background(androidx.compose.ui.graphics.Color(0xFF35D07F), CircleShape))
+                                        Box(Modifier.size(7.dp).background(apiStatusColor, CircleShape))
                                         Spacer(Modifier.width(6.dp))
-                                        Text("API", style = MaterialTheme.typography.labelMedium, color = androidx.compose.ui.graphics.Color(0xFF65E6A2))
+                                        Text(apiStatusLabel, style = MaterialTheme.typography.labelMedium, color = apiStatusColor)
                                     }
                                 }
                             }
