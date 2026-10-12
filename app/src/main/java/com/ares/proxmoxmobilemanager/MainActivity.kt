@@ -1896,27 +1896,37 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
         scope.launch {
             try {
                 console.openNode(base, connection, node, { bytes ->
-                    val message = bytes.toString(Charsets.UTF_8)
-                    if (message.trim() == "OK") {
-                        connected = true
-                    } else {
-                        val payloads = decodeTermproxyPayloads(bytes)
-                        if (payloads.isNotEmpty()) {
-                            payloads.forEach { payload ->
-                                terminalEmulator.writeInput(payload)
-                                output = (output + payload.toString(Charsets.UTF_8)).takeLast(30000)
-                            }
+                    scope.launch {
+                        val message = bytes.toString(Charsets.UTF_8)
+                        if (message.trim() == "OK") {
                             connected = true
-                        } else if (message.startsWith("ERR") || message.contains("authentication failed", true)) {
-                            error = message.take(500)
+                        } else {
+                            val payloads = decodeTermproxyPayloads(bytes)
+                            if (payloads.isNotEmpty()) {
+                                payloads.forEach { payload ->
+                                    terminalEmulator.writeInput(payload)
+                                    output = (output + payload.toString(Charsets.UTF_8)).takeLast(30000)
+                                }
+                                connected = true
+                            } else if (message.startsWith("ERR") || message.contains("authentication failed", true)) {
+                                error = message.take(500)
+                            } else if (bytes.isNotEmpty() && !message.startsWith("0:")) {
+                                terminalEmulator.writeInput(bytes)
+                                output = (output + message).takeLast(30000)
+                                connected = true
+                            }
                         }
                     }
                 }, { reason ->
-                    connected = false
-                    if (reason != null) output = (output + "\n[Veza zatvorena: " + reason + "]\n").takeLast(30000)
+                    scope.launch {
+                        connected = false
+                        if (reason != null) output = (output + "\n[Veza zatvorena: " + reason + "]\n").takeLast(30000)
+                    }
                 }, { e ->
-                    connected = false
-                    error = e.message ?: "Greška node shell-a"
+                    scope.launch {
+                        connected = false
+                        error = e.message ?: "Greška node shell-a"
+                    }
                 })
             } catch (e: Exception) {
                 connected = false
@@ -2309,33 +2319,39 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
         scope.launch{
             try{
                 console.open(base,connection,vm,{b->
-                    val message=b.toString(Charsets.UTF_8)
-                    if(message=="OK" || message.trim()=="OK") {
-                        connected=true
-                    } else {
-                        val payloads=decodeTermproxyPayloads(b)
-                        if(payloads.isNotEmpty()) {
-                            payloads.forEach { payload ->
-                                terminalEmulator.writeInput(payload)
-                                output=(output+payload.toString(Charsets.UTF_8)).takeLast(30000)
+                    // OkHttp invokes WebSocket callbacks on its own thread. Keep all
+                    // Compose state and terminal-emulator mutations on the UI dispatcher.
+                    scope.launch {
+                        val message=b.toString(Charsets.UTF_8)
+                        if(message=="OK" || message.trim()=="OK") {
+                            connected=true
+                        } else {
+                            val payloads=decodeTermproxyPayloads(b)
+                            if(payloads.isNotEmpty()) {
+                                payloads.forEach { payload ->
+                                    terminalEmulator.writeInput(payload)
+                                    output=(output+payload.toString(Charsets.UTF_8)).takeLast(30000)
+                                }
+                                connected=true
+                            } else if(message.startsWith("ERR") || message.contains("authentication failed",true)) {
+                                error=message.take(500)
+                            } else if (b.isNotEmpty() && !message.startsWith("0:")) {
+                                terminalEmulator.writeInput(b)
+                                output=(output+message).takeLast(30000)
+                                connected=true
                             }
-                            connected=true
-                        } else if(message.startsWith("ERR") || message.contains("authentication failed",true)) {
-                            error=message.take(500)
-                        } else if (b.isNotEmpty() && !message.startsWith("0:")) {
-                            // Some Proxmox/proxy versions deliver terminal bytes without the
-                            // termproxy length envelope. Do not silently discard them.
-                            terminalEmulator.writeInput(b)
-                            output=(output+message).takeLast(30000)
-                            connected=true
                         }
                     }
                 },{reason->
-                    connected=false
-                    if(reason!=null) output=(output+"\n[Veza zatvorena: "+reason+"]\n").takeLast(30000)
+                    scope.launch {
+                        connected=false
+                        if(reason!=null) output=(output+"\n[Veza zatvorena: "+reason+"]\n").takeLast(30000)
+                    }
                 },{e->
-                    connected=false
-                    error=e.message?:"Greška konzole"
+                    scope.launch {
+                        connected=false
+                        error=e.message?:"Greška konzole"
+                    }
                 })
             }catch(e:Exception){
                 connected=false
