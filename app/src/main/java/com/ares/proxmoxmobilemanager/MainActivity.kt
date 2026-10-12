@@ -42,7 +42,11 @@ fun ProxmoxApp() {
     val context = LocalContext.current
     val uiPrefs = remember { context.getSharedPreferences("ui_preferences", Context.MODE_PRIVATE) }
     var theme by remember { mutableStateOf(uiPrefs.getString("theme", "system") ?: "system") }
-    val dark = theme != "light"
+    val dark = when (theme) {
+        "light" -> false
+        "dark" -> true
+        else -> isSystemInDarkTheme()
+    }
     val appColors = if (dark) darkColorScheme(
         primary = androidx.compose.ui.graphics.Color(0xFF38D6E8),
         onPrimary = androidx.compose.ui.graphics.Color(0xFF04171B),
