@@ -2016,8 +2016,22 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                listOf("summary" to "Pregled", "logs" to "Syslog", "updates" to "Update", "disks" to "Diskovi", "network" to "Mreža", "firewall" to "Firewall", "tasks" to "Zadaci").forEach { (id, label) ->
-                    FilterChip(selected = tab == id, onClick = { tab = id }, enabled = !busy, label = { Text(label) })
+                listOf(
+                    Triple("summary", "Pregled", Icons.Default.Dashboard),
+                    Triple("logs", "Syslog", Icons.Default.Article),
+                    Triple("updates", "Update", Icons.Default.SystemUpdate),
+                    Triple("disks", "Diskovi", Icons.Default.Storage),
+                    Triple("network", "Mreža", Icons.Default.Lan),
+                    Triple("firewall", "Firewall", Icons.Default.Security),
+                    Triple("tasks", "Zadaci", Icons.Default.History)
+                ).forEach { (id, label, icon) ->
+                    FilterChip(
+                        selected = tab == id,
+                        onClick = { tab = id },
+                        enabled = !busy,
+                        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                        label = { Text(label) }
+                    )
                 }
             }
             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
