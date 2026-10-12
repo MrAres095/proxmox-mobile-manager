@@ -250,8 +250,12 @@ class ProxmoxConsole(
         }
         override fun onFailure(ws: WebSocket, t: Throwable, res: Response?) {
             if (socket === ws) socket = null
-            val detail = res?.let { " (HTTP ${it.code})" }.orEmpty()
-            onError(IllegalStateException((t.message ?: "WebSocket greška") + detail, t))
+            val detail = res?.let { response ->
+                val protocol = response.header("Sec-WebSocket-Protocol")?.let { ", protocol=${it}" }.orEmpty()
+                " (HTTP ${response.code} ${response.message}$protocol)"
+            }.orEmpty()
+            val cause = t.message?.takeIf { it.isNotBlank() } ?: t.javaClass.simpleName
+            onError(IllegalStateException("WebSocket: $cause$detail", t))
             onClosed(t.message)
         }
         override fun onClosed(ws: WebSocket, code: Int, reason: String) {
