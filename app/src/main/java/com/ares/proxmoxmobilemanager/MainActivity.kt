@@ -819,7 +819,7 @@ private fun Dashboard(
             TopAppBar(
                 title = {
                     Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Text("Proxmox Control", style = MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                        Text("Proxmox Manager", style = MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
                         Text(base, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                     }
                 },
@@ -833,7 +833,7 @@ private fun Dashboard(
             NavigationBar {
                 NavigationBarItem(selected = selectedTab == "overview", onClick = { selectedTab = "overview" }, icon = { Icon(Icons.Default.Dashboard, null) }, label = { Text("Pregled") })
                 NavigationBarItem(selected = selectedTab == "guests", onClick = { selectedTab = "guests" }, icon = { Icon(Icons.Default.Dns, null) }, label = { Text("Guestovi") })
-                NavigationBarItem(selected = selectedTab == "storage", onClick = { selectedTab = "storage" }, icon = { Icon(Icons.Default.Storage, null) }, label = { Text("Storage") })
+                NavigationBarItem(selected = selectedTab == "storage", onClick = { selectedTab = "storage" }, icon = { Icon(Icons.Default.Storage, null) }, label = { Text("Pohrana") })
                 NavigationBarItem(selected = selectedTab == "nodes", onClick = { selectedTab = "nodes" }, icon = { Icon(Icons.Default.Computer, null) }, label = { Text("Nodeovi") })
             }
         }
@@ -2238,13 +2238,13 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedButton({ clipboard.setText(androidx.compose.ui.text.AnnotatedString(latestOutput)) }, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("Kopiraj zapis")
+                    Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("Kopiraj")
                 }
                 OutlinedButton({ clipboard.getText()?.text?.let { if (it.isNotEmpty()) console.send(it) } }, enabled = connected && !clipboard.getText()?.text.isNullOrEmpty(), modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.ContentPaste, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("Zalijepi")
                 }
                 OutlinedButton({ terminalEmulator.clearScreen(); output = "" }, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.DeleteSweep, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("Očisti terminal")
+                    Icon(Icons.Default.DeleteSweep, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("Očisti")
                 }
             }
             Row(
@@ -2696,7 +2696,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilledTonalButton(onClick = { terminalFocusRequester.requestFocus(); keyboardController?.show() }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Keyboard, null); Spacer(Modifier.width(6.dp)); Text("Tipkovnica") }
-                OutlinedButton(onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(latestOutput)) }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.ContentCopy, null); Spacer(Modifier.width(6.dp)); Text("Kopiraj zapis") }
+                OutlinedButton(onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(latestOutput)) }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.ContentCopy, null); Spacer(Modifier.width(6.dp)); Text("Kopiraj") }
                 IconButton(onClick = { terminalEmulator.clearScreen(); output = "" }) { Icon(Icons.Default.DeleteSweep, contentDescription = "Očisti terminal") }
             }
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
