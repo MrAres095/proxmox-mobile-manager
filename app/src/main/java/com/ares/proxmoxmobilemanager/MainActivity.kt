@@ -1028,8 +1028,29 @@ private fun Dashboard(
                             if (clusterStatus.version.isNotBlank()) Text("Verzija: ${clusterStatus.version}")
                             Text("Nodeovi: ${clusterStatus.nodes.size}")
                             clusterStatus.nodes.forEach { (name, online) ->
-                                Text("$name • ${if (online == "1") "online" else "offline"}", style = MaterialTheme.typography.bodySmall)
+                                val targetNode = nodes.firstOrNull { it.node == name }
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onClick = { targetNode?.let(onNodeOpen) },
+                                    enabled = targetNode != null,
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
+                                    Row(
+                                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.Dns, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                        Spacer(Modifier.width(10.dp))
+                                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                            Text(name, style = MaterialTheme.typography.titleSmall)
+                                            Text(if (online == "1") "Online • dodirni za upravljanje" else "Offline • dodirni za detalje", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        Icon(Icons.Default.ChevronRight, contentDescription = "Otvori node")
+                                    }
+                                }
                             }
+                            Spacer(Modifier.height(4.dp))
+                            Text("Odaberi node iz clustera za pristup njegovim diskovima, mreži, zadacima i shellu.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         } else {
                             Text("Ovaj Proxmox trenutno nije član clustera.")
                             Text("U sljedećem koraku dodajemo kreiranje i siguran join clustera.", style = MaterialTheme.typography.bodySmall)
