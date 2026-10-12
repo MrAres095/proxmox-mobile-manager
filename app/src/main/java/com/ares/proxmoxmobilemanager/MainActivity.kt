@@ -1949,6 +1949,8 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
     var tab by remember { mutableStateOf("summary") }
     var logs by remember { mutableStateOf<List<String>>(emptyList()) }
     var logSearch by remember { mutableStateOf("") }
+    var diskSearch by remember { mutableStateOf("") }
+    var networkSearch by remember { mutableStateOf("") }
     var updates by remember { mutableStateOf<List<Pair<String,String>>>(emptyList()) }
     var disks by remember { mutableStateOf<List<String>>(emptyList()) }
     var network by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -2244,13 +2246,42 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(bottom = 20.dp)
                 ) {
-                    item { Text("POHRANA NODEA", Modifier.padding(start = 4.dp, top = 4.dp, bottom = 2.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.2.sp) }
-                    items(disks) { diskLine ->
-                        Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                            Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.Top) {
-                                Icon(Icons.Default.Storage, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 2.dp).size(19.dp))
-                                Spacer(Modifier.width(10.dp))
-                                SelectionContainer { Text(diskLine, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium) }
+                    item {
+                        Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text("POHRANA NODEA", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.2.sp)
+                                Text("${disks.size} zapisa o pohrani", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Icon(Icons.Default.Storage, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = diskSearch,
+                            onValueChange = { diskSearch = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            label = { Text("Pretraži diskove") },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                            trailingIcon = {
+                                if (diskSearch.isNotEmpty()) IconButton(onClick = { diskSearch = "" }) {
+                                    Icon(Icons.Default.Clear, contentDescription = "Očisti pretragu")
+                                }
+                            }
+                        )
+                    }
+                    if (disks.none { it.contains(diskSearch, ignoreCase = true) }) {
+                        item { EmptyNodeSection(if (diskSearch.isBlank()) "Nema diskova za prikaz." else "Nema diskova koji odgovaraju pretrazi.") }
+                    } else {
+                        items(disks.filter { it.contains(diskSearch, ignoreCase = true) }) { diskLine ->
+                            Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                                Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.Top) {
+                                    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(40.dp)) {
+                                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Storage, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer) }
+                                    }
+                                    Spacer(Modifier.width(12.dp))
+                                    SelectionContainer { Text(diskLine, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium) }
+                                }
                             }
                         }
                     }
@@ -2260,13 +2291,42 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(bottom = 20.dp)
                 ) {
-                    item { Text("MREŽNA SUČELJA", Modifier.padding(start = 4.dp, top = 4.dp, bottom = 2.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.2.sp) }
-                    items(network) { networkLine ->
-                        Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                            Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.Top) {
-                                Icon(Icons.Default.Lan, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 2.dp).size(19.dp))
-                                Spacer(Modifier.width(10.dp))
-                                SelectionContainer { Text(networkLine, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium) }
+                    item {
+                        Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text("MREŽNA SUČELJA", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.2.sp)
+                                Text("${network.size} zapisa o sučeljima", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Icon(Icons.Default.Lan, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = networkSearch,
+                            onValueChange = { networkSearch = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            label = { Text("Pretraži mrežna sučelja") },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                            trailingIcon = {
+                                if (networkSearch.isNotEmpty()) IconButton(onClick = { networkSearch = "" }) {
+                                    Icon(Icons.Default.Clear, contentDescription = "Očisti pretragu")
+                                }
+                            }
+                        )
+                    }
+                    if (network.none { it.contains(networkSearch, ignoreCase = true) }) {
+                        item { EmptyNodeSection(if (networkSearch.isBlank()) "Nema mrežnih sučelja za prikaz." else "Nema sučelja koja odgovaraju pretrazi.") }
+                    } else {
+                        items(network.filter { it.contains(networkSearch, ignoreCase = true) }) { networkLine ->
+                            Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                                Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.Top) {
+                                    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(40.dp)) {
+                                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Lan, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer) }
+                                    }
+                                    Spacer(Modifier.width(12.dp))
+                                    SelectionContainer { Text(networkLine, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium) }
+                                }
                             }
                         }
                     }
