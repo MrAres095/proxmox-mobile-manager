@@ -2819,10 +2819,10 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
                     backgroundColor = terminalBg, foregroundColor = terminalFg, keyboardEnabled = true, showSoftKeyboard = true
                 )
             }
-            if (imeVisible) Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+            if (imeVisible) Column(Modifier.fillMaxWidth().background(androidx.compose.ui.graphics.Color(0xFF202833)), verticalArrangement = Arrangement.spacedBy(0.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                     listOf("ESC" to "\u001b", "/" to "/", "-" to "-", "HOME" to "\u001b[H", "↑" to "\u001b[A", "END" to "\u001b[F", "PGUP" to "\u001b[5~").forEach { (label, sequence) ->
-                        TextButton(onClick = { ctrlModifierActive = false; console.send(sequence); keyboardController?.show() }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f).focusProperties { canFocus = false }) { Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium) }
+                        TextButton(onClick = { ctrlModifierActive = false; console.send(sequence); keyboardController?.show() }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f).focusProperties { canFocus = false }) { Text(label, maxLines = 1, color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.labelMedium) }
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
@@ -2831,7 +2831,7 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
                             if (sequence == "CTRL") { ctrlModifierActive = !ctrlModifierActive; keyboardController?.show() }
                             else { ctrlModifierActive = false; console.send(sequence); keyboardController?.show() }
                         }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f).focusProperties { canFocus = false }) {
-                            Text(if (label == "CTRL" && ctrlModifierActive) "CTRL ✓" else label, maxLines = 1, style = MaterialTheme.typography.labelMedium)
+                            Text(if (label == "CTRL" && ctrlModifierActive) "CTRL ✓" else label, maxLines = 1, color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
@@ -3272,10 +3272,10 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
                     backgroundColor = terminalBg, foregroundColor = terminalFg, keyboardEnabled = true, showSoftKeyboard = true
                 )
             }
-            if (imeVisible) Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+            if (imeVisible) Column(Modifier.fillMaxWidth().background(androidx.compose.ui.graphics.Color(0xFF202833)), verticalArrangement = Arrangement.spacedBy(0.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                     listOf("ESC" to "\u001b", "/" to "/", "-" to "-", "HOME" to "\u001b[H", "↑" to "\u001b[A", "END" to "\u001b[F", "PGUP" to "\u001b[5~").forEach { (label, sequence) ->
-                        TextButton(onClick = { ctrlModifierActive = false; console.send(sequence); keyboardController?.show() }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f).focusProperties { canFocus = false }) { Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium) }
+                        TextButton(onClick = { ctrlModifierActive = false; console.send(sequence); keyboardController?.show() }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f).focusProperties { canFocus = false }) { Text(label, maxLines = 1, color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.labelMedium) }
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
@@ -3284,7 +3284,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
                             if (sequence == "CTRL") { ctrlModifierActive = !ctrlModifierActive; keyboardController?.show() }
                             else { ctrlModifierActive = false; console.send(sequence); keyboardController?.show() }
                         }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f).focusProperties { canFocus = false }) {
-                            Text(if (label == "CTRL" && ctrlModifierActive) "CTRL ✓" else label, maxLines = 1, style = MaterialTheme.typography.labelMedium)
+                            Text(if (label == "CTRL" && ctrlModifierActive) "CTRL ✓" else label, maxLines = 1, color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
