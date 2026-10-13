@@ -24,6 +24,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
@@ -2817,7 +2818,7 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
                     backgroundColor = terminalBg, foregroundColor = terminalFg, keyboardEnabled = true, showSoftKeyboard = true
                 )
             }
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (imeVisible) Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)), verticalArrangement = Arrangement.spacedBy(0.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                     listOf("ESC" to "\u001b", "/" to "/", "-" to "-", "HOME" to "\u001b[H", "↑" to "\u001b[A", "END" to "\u001b[F", "PGUP" to "\u001b[5~").forEach { (label, sequence) ->
                         TextButton(onClick = { ctrlModifierActive = false; console.send(sequence); keyboardController?.show() }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f).focusProperties { canFocus = false }) { Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium) }
@@ -3269,7 +3270,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
                     backgroundColor = terminalBg, foregroundColor = terminalFg, keyboardEnabled = true, showSoftKeyboard = true
                 )
             }
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (imeVisible) Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)), verticalArrangement = Arrangement.spacedBy(0.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                     listOf("ESC" to "\u001b", "/" to "/", "-" to "-", "HOME" to "\u001b[H", "↑" to "\u001b[A", "END" to "\u001b[F", "PGUP" to "\u001b[5~").forEach { (label, sequence) ->
                         TextButton(onClick = { ctrlModifierActive = false; console.send(sequence); keyboardController?.show() }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f).focusProperties { canFocus = false }) { Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium) }
