@@ -2795,7 +2795,7 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
             )
         }
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 8.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Column(Modifier.fillMaxSize().padding(padding).imePadding().padding(horizontal = 8.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Surface(shape = CircleShape, color = if (connected) androidx.compose.ui.graphics.Color(0xFF123A2B) else MaterialTheme.colorScheme.surfaceVariant) {
                     Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -2820,14 +2820,14 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                     listOf("ESC" to "\u001b", "/" to "/", "-" to "-", "HOME" to "\u001b[H", "↑" to "\u001b[A", "END" to "\u001b[F", "PGUP" to "\u001b[5~").forEach { (label, sequence) ->
-                        TextButton(onClick = { ctrlModifierActive = false; console.send(sequence); terminalFocusRequester.requestFocus() }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f).focusProperties { canFocus = false }) { Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium) }
+                        TextButton(onClick = { ctrlModifierActive = false; console.send(sequence); keyboardController?.show() }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f).focusProperties { canFocus = false }) { Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium) }
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                     listOf("TAB" to "\t", "CTRL" to "CTRL", "ALT" to "\u001b", "←" to "\u001b[D", "↓" to "\u001b[B", "→" to "\u001b[C", "PGDN" to "\u001b[6~").forEach { (label, sequence) ->
                         TextButton(onClick = {
-                            if (sequence == "CTRL") { ctrlModifierActive = !ctrlModifierActive; terminalFocusRequester.requestFocus(); keyboardController?.show() }
-                            else { ctrlModifierActive = false; console.send(sequence); terminalFocusRequester.requestFocus() }
+                            if (sequence == "CTRL") { ctrlModifierActive = !ctrlModifierActive; keyboardController?.show() }
+                            else { ctrlModifierActive = false; console.send(sequence); keyboardController?.show() }
                         }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f).focusProperties { canFocus = false }) {
                             Text(if (label == "CTRL" && ctrlModifierActive) "CTRL ✓" else label, maxLines = 1, style = MaterialTheme.typography.labelMedium)
                         }
@@ -3272,14 +3272,14 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                     listOf("ESC" to "\u001b", "/" to "/", "-" to "-", "HOME" to "\u001b[H", "↑" to "\u001b[A", "END" to "\u001b[F", "PGUP" to "\u001b[5~").forEach { (label, sequence) ->
-                        TextButton(onClick = { ctrlModifierActive = false; console.send(sequence); terminalFocusRequester.requestFocus() }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f).focusProperties { canFocus = false }) { Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium) }
+                        TextButton(onClick = { ctrlModifierActive = false; console.send(sequence); keyboardController?.show() }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f).focusProperties { canFocus = false }) { Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium) }
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                     listOf("TAB" to "\t", "CTRL" to "CTRL", "ALT" to "\u001b", "←" to "\u001b[D", "↓" to "\u001b[B", "→" to "\u001b[C", "PGDN" to "\u001b[6~").forEach { (label, sequence) ->
                         TextButton(onClick = {
-                            if (sequence == "CTRL") { ctrlModifierActive = !ctrlModifierActive; terminalFocusRequester.requestFocus(); keyboardController?.show() }
-                            else { ctrlModifierActive = false; console.send(sequence); terminalFocusRequester.requestFocus() }
+                            if (sequence == "CTRL") { ctrlModifierActive = !ctrlModifierActive; keyboardController?.show() }
+                            else { ctrlModifierActive = false; console.send(sequence); keyboardController?.show() }
                         }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f).focusProperties { canFocus = false }) {
                             Text(if (label == "CTRL" && ctrlModifierActive) "CTRL ✓" else label, maxLines = 1, style = MaterialTheme.typography.labelMedium)
                         }
