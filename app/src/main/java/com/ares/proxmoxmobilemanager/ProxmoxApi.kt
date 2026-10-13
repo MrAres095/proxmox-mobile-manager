@@ -338,7 +338,9 @@ class ProxmoxApi {
                         results.add("FIZIČKI DISK • $path  •  $model  •  $sizeText  •  $type  •  $usage")
                     }
                 }
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+                results.add("DIAGNOSTIKA • Fizički diskovi nisu dostupni preko Proxmox API-ja; provjeri dozvole korisnika i endpoint.")
+            }
 
             // Proxmox exposes ZFS pools separately from the physical disk inventory.
             // Keep physical disk results available even when this endpoint is unsupported or permission-denied.
@@ -363,7 +365,9 @@ class ProxmoxApi {
                         results.add("ZFS POOL • $name • stanje: $health$capacity$used$available")
                     }
                 }
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+                results.add("DIAGNOSTIKA • ZFS poolovi nisu dostupni preko Proxmox API-ja; provjeri dozvole korisnika i podršku nodea.")
+            }
             results
         }
 
