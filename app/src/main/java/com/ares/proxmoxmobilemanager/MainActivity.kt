@@ -2791,6 +2791,7 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
                 title = {
@@ -3276,6 +3277,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
     }
 
     Scaffold(
+        contentWindowInsets=WindowInsets(0.dp),
         topBar={TopAppBar(
             title={
                 Column(verticalArrangement=Arrangement.spacedBy(1.dp)){
