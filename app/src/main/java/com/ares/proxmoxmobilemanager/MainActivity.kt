@@ -2809,7 +2809,7 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
             )
         }
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).imePadding().padding(horizontal = 8.dp, vertical = if (imeVisible) 0.dp else 6.dp), verticalArrangement = Arrangement.spacedBy(if (imeVisible) 0.dp else 7.dp)) {
+        Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 8.dp, vertical = if (imeVisible) 0.dp else 6.dp), verticalArrangement = Arrangement.spacedBy(if (imeVisible) 0.dp else 7.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Surface(shape = CircleShape, color = if (connected) androidx.compose.ui.graphics.Color(0xFF123A2B) else MaterialTheme.colorScheme.surfaceVariant) {
                     Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -3292,7 +3292,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
             }
         )}
     ){p->
-        Column(Modifier.fillMaxSize().padding(p).imePadding().padding(horizontal=8.dp, vertical=if (imeVisible) 0.dp else 6.dp), verticalArrangement=Arrangement.spacedBy(if (imeVisible) 0.dp else 7.dp)){
+        Column(Modifier.fillMaxSize().padding(p).padding(horizontal=8.dp, vertical=if (imeVisible) 0.dp else 6.dp), verticalArrangement=Arrangement.spacedBy(if (imeVisible) 0.dp else 7.dp)){
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Surface(shape = CircleShape, color = if (connected) androidx.compose.ui.graphics.Color(0xFF123A2B) else MaterialTheme.colorScheme.surfaceVariant) {
                     Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
