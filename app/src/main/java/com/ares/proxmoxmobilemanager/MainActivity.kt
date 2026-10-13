@@ -2654,6 +2654,7 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val terminalFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { context.getSharedPreferences("console_state", Context.MODE_PRIVATE) }
@@ -3106,6 +3107,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
     val lifecycleOwner=androidx.lifecycle.compose.LocalLifecycleOwner.current
     val clipboard=androidx.compose.ui.platform.LocalClipboardManager.current
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val terminalFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
     val context=androidx.compose.ui.platform.LocalContext.current
     val consolePrefs=remember{context.getSharedPreferences("console_state", Context.MODE_PRIVATE)}
