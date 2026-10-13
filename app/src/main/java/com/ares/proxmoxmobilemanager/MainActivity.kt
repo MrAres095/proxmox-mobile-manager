@@ -2816,52 +2816,22 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
                     backgroundColor = terminalBg, foregroundColor = terminalFg, keyboardEnabled = true, showSoftKeyboard = true
                 )
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedButton({ clipboard.setText(androidx.compose.ui.text.AnnotatedString(latestOutput)) }, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("Kopiraj")
-                }
-                OutlinedButton({ clipboard.getText()?.text?.let { if (it.isNotEmpty()) console.send(it) } }, enabled = connected && !clipboard.getText()?.text.isNullOrEmpty(), modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.ContentPaste, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("Zalijepi")
-                }
-                OutlinedButton({ terminalEmulator.clearScreen(); output = "" }, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.DeleteSweep, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("Očisti")
-                }
-            }
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                FilledTonalButton(
-                    onClick = { ctrlModifierActive = !ctrlModifierActive; terminalFocusRequester.requestFocus(); keyboardController?.show() },
-                    enabled = connected,
-                    colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
-                        containerColor = if (ctrlModifierActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = if (ctrlModifierActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
-                    ),
-                    modifier = Modifier.height(42.dp),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp)
-                ) { Text(if (ctrlModifierActive) "CTRL ✓" else "CTRL", style = MaterialTheme.typography.labelMedium) }
-                listOf("ESC" to "\u001b", "TAB" to "\t", "ALT" to "\u001b", "↑" to "\u001b[A", "↓" to "\u001b[B", "←" to "\u001b[D", "→" to "\u001b[C", "HOME" to "\u001b[H", "END" to "\u001b[F", "PGUP" to "\u001b[5~", "PGDN" to "\u001b[6~", "ENTER" to "\r", "BACKSPACE" to "\u007f").forEach { (label, sequence) ->
-                    FilledTonalButton(
-                        onClick = { ctrlModifierActive = false; console.send(sequence) },
-                        enabled = connected,
-                        modifier = Modifier.widthIn(min = 66.dp).height(42.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
-                    ) {
-                        Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                    listOf("ESC" to "\u001b", "/" to "/", "-" to "-", "HOME" to "\u001b[H", "↑" to "\u001b[A", "END" to "\u001b[F", "PGUP" to "\u001b[5~").forEach { (label, sequence) ->
+                        TextButton(onClick = { ctrlModifierActive = false; console.send(sequence); terminalFocusRequester.requestFocus() }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f)) { Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium) }
                     }
                 }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                FilledTonalButton(onClick = { console.send("\u001b[D") }, enabled = connected, modifier = Modifier.size(width = 58.dp, height = 40.dp), contentPadding = PaddingValues(0.dp)) { Text("←", style = MaterialTheme.typography.titleLarge) }
-                Spacer(Modifier.width(6.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    FilledTonalButton(onClick = { console.send("\u001b[A") }, enabled = connected, modifier = Modifier.size(width = 58.dp, height = 40.dp), contentPadding = PaddingValues(0.dp)) { Text("↑", style = MaterialTheme.typography.titleLarge) }
-                    FilledTonalButton(onClick = { console.send("\u001b[B") }, enabled = connected, modifier = Modifier.size(width = 58.dp, height = 40.dp), contentPadding = PaddingValues(0.dp)) { Text("↓", style = MaterialTheme.typography.titleLarge) }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                    listOf("TAB" to "\\t", "CTRL" to "CTRL", "ALT" to "\u001b", "←" to "\u001b[D", "↓" to "\u001b[B", "→" to "\u001b[C", "PGDN" to "\u001b[6~").forEach { (label, sequence) ->
+                        TextButton(onClick = {
+                            if (sequence == "CTRL") { ctrlModifierActive = !ctrlModifierActive; terminalFocusRequester.requestFocus(); keyboardController?.show() }
+                            else { ctrlModifierActive = false; console.send(sequence); terminalFocusRequester.requestFocus() }
+                        }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f)) {
+                            Text(if (label == "CTRL" && ctrlModifierActive) "CTRL ✓" else label, maxLines = 1, style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
                 }
-                Spacer(Modifier.width(6.dp))
-                FilledTonalButton(onClick = { console.send("\u001b[C") }, enabled = connected, modifier = Modifier.size(width = 58.dp, height = 40.dp), contentPadding = PaddingValues(0.dp)) { Text("→", style = MaterialTheme.typography.titleLarge) }
             }
             if (error != null) Text(error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
@@ -3298,24 +3268,21 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
                     backgroundColor = terminalBg, foregroundColor = terminalFg, keyboardEnabled = true, showSoftKeyboard = true
                 )
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = { terminalFocusRequester.requestFocus(); keyboardController?.show() }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Keyboard, null); Spacer(Modifier.width(6.dp)); Text("Tipkovnica") }
-                OutlinedButton(onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(latestOutput)) }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.ContentCopy, null); Spacer(Modifier.width(6.dp)); Text("Kopiraj") }
-                IconButton(onClick = { terminalEmulator.clearScreen(); output = "" }) { Icon(Icons.Default.DeleteSweep, contentDescription = "Očisti terminal") }
-            }
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                FilledTonalButton(
-                    onClick = { ctrlModifierActive = !ctrlModifierActive; terminalFocusRequester.requestFocus(); keyboardController?.show() },
-                    enabled = connected,
-                    colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
-                        containerColor = if (ctrlModifierActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = if (ctrlModifierActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
-                    ),
-                    modifier = Modifier.height(42.dp),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp)
-                ) { Text(if (ctrlModifierActive) "CTRL ✓" else "CTRL", style = MaterialTheme.typography.labelMedium) }
-                listOf("ESC" to "\u001b", "TAB" to "\t", "↑" to "\u001b[A", "↓" to "\u001b[B", "←" to "\u001b[D", "→" to "\u001b[C", "HOME" to "\u001b[H", "END" to "\u001b[F", "ENTER" to "\r", "BACKSPACE" to "\u007f").forEach { (label, sequence) ->
-                    FilledTonalButton(onClick = { ctrlModifierActive = false; terminalFocusRequester.requestFocus(); console.send(sequence) }, enabled = connected, modifier = Modifier.widthIn(min = 64.dp).height(42.dp), contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)) { Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1) }
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                    listOf("ESC" to "\u001b", "/" to "/", "-" to "-", "HOME" to "\u001b[H", "↑" to "\u001b[A", "END" to "\u001b[F", "PGUP" to "\u001b[5~").forEach { (label, sequence) ->
+                        TextButton(onClick = { ctrlModifierActive = false; console.send(sequence); terminalFocusRequester.requestFocus() }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f)) { Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium) }
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                    listOf("TAB" to "\\t", "CTRL" to "CTRL", "ALT" to "\u001b", "←" to "\u001b[D", "↓" to "\u001b[B", "→" to "\u001b[C", "PGDN" to "\u001b[6~").forEach { (label, sequence) ->
+                        TextButton(onClick = {
+                            if (sequence == "CTRL") { ctrlModifierActive = !ctrlModifierActive; terminalFocusRequester.requestFocus(); keyboardController?.show() }
+                            else { ctrlModifierActive = false; console.send(sequence); terminalFocusRequester.requestFocus() }
+                        }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f)) {
+                            Text(if (label == "CTRL" && ctrlModifierActive) "CTRL ✓" else label, maxLines = 1, style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
                 }
             }
             if (error != null) { Surface(color = MaterialTheme.colorScheme.errorContainer, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) { Text(error!!, modifier = Modifier.padding(10.dp), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodySmall) } }
