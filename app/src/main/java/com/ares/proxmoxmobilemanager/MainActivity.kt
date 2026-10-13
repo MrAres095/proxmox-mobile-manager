@@ -3247,7 +3247,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
             }
         )}
     ){p->
-        Column(Modifier.fillMaxSize().padding(p).padding(horizontal=8.dp, vertical=6.dp), verticalArrangement=Arrangement.spacedBy(7.dp)){
+        Column(Modifier.fillMaxSize().padding(p).imePadding().padding(horizontal=8.dp, vertical=6.dp), verticalArrangement=Arrangement.spacedBy(7.dp)){
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Surface(shape = CircleShape, color = if (connected) androidx.compose.ui.graphics.Color(0xFF123A2B) else MaterialTheme.colorScheme.surfaceVariant) {
                     Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
