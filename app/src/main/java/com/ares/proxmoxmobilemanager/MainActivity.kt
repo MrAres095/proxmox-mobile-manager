@@ -2823,7 +2823,7 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                    listOf("TAB" to "\\t", "CTRL" to "CTRL", "ALT" to "\u001b", "←" to "\u001b[D", "↓" to "\u001b[B", "→" to "\u001b[C", "PGDN" to "\u001b[6~").forEach { (label, sequence) ->
+                    listOf("TAB" to "\t", "CTRL" to "CTRL", "ALT" to "\u001b", "←" to "\u001b[D", "↓" to "\u001b[B", "→" to "\u001b[C", "PGDN" to "\u001b[6~").forEach { (label, sequence) ->
                         TextButton(onClick = {
                             if (sequence == "CTRL") { ctrlModifierActive = !ctrlModifierActive; terminalFocusRequester.requestFocus(); keyboardController?.show() }
                             else { ctrlModifierActive = false; console.send(sequence); terminalFocusRequester.requestFocus() }
@@ -3275,7 +3275,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                    listOf("TAB" to "\\t", "CTRL" to "CTRL", "ALT" to "\u001b", "←" to "\u001b[D", "↓" to "\u001b[B", "→" to "\u001b[C", "PGDN" to "\u001b[6~").forEach { (label, sequence) ->
+                    listOf("TAB" to "\t", "CTRL" to "CTRL", "ALT" to "\u001b", "←" to "\u001b[D", "↓" to "\u001b[B", "→" to "\u001b[C", "PGDN" to "\u001b[6~").forEach { (label, sequence) ->
                         TextButton(onClick = {
                             if (sequence == "CTRL") { ctrlModifierActive = !ctrlModifierActive; terminalFocusRequester.requestFocus(); keyboardController?.show() }
                             else { ctrlModifierActive = false; console.send(sequence); terminalFocusRequester.requestFocus() }
