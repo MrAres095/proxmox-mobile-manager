@@ -2819,7 +2819,7 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                     listOf("ESC" to "\u001b", "/" to "/", "-" to "-", "HOME" to "\u001b[H", "↑" to "\u001b[A", "END" to "\u001b[F", "PGUP" to "\u001b[5~").forEach { (label, sequence) ->
-                        TextButton(onClick = { ctrlModifierActive = false; console.send(sequence); terminalFocusRequester.requestFocus() }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f)) { Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium) }
+                        TextButton(onClick = { ctrlModifierActive = false; console.send(sequence); terminalFocusRequester.requestFocus() }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f).focusProperties { canFocus = false }) { Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium) }
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
@@ -2827,7 +2827,7 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
                         TextButton(onClick = {
                             if (sequence == "CTRL") { ctrlModifierActive = !ctrlModifierActive; terminalFocusRequester.requestFocus(); keyboardController?.show() }
                             else { ctrlModifierActive = false; console.send(sequence); terminalFocusRequester.requestFocus() }
-                        }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f)) {
+                        }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f).focusProperties { canFocus = false }) {
                             Text(if (label == "CTRL" && ctrlModifierActive) "CTRL ✓" else label, maxLines = 1, style = MaterialTheme.typography.labelMedium)
                         }
                     }
@@ -3271,7 +3271,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                     listOf("ESC" to "\u001b", "/" to "/", "-" to "-", "HOME" to "\u001b[H", "↑" to "\u001b[A", "END" to "\u001b[F", "PGUP" to "\u001b[5~").forEach { (label, sequence) ->
-                        TextButton(onClick = { ctrlModifierActive = false; console.send(sequence); terminalFocusRequester.requestFocus() }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f)) { Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium) }
+                        TextButton(onClick = { ctrlModifierActive = false; console.send(sequence); terminalFocusRequester.requestFocus() }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f).focusProperties { canFocus = false }) { Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium) }
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
@@ -3279,7 +3279,7 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
                         TextButton(onClick = {
                             if (sequence == "CTRL") { ctrlModifierActive = !ctrlModifierActive; terminalFocusRequester.requestFocus(); keyboardController?.show() }
                             else { ctrlModifierActive = false; console.send(sequence); terminalFocusRequester.requestFocus() }
-                        }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f)) {
+                        }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f).focusProperties { canFocus = false }) {
                             Text(if (label == "CTRL" && ctrlModifierActive) "CTRL ✓" else label, maxLines = 1, style = MaterialTheme.typography.labelMedium)
                         }
                     }
