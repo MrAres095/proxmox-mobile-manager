@@ -716,6 +716,7 @@ private fun Dashboard(
     var deleteGuestVm by remember { mutableStateOf<ProxmoxVm?>(null) }
     var deleteGuestConfirmation by remember { mutableStateOf("") }
     var deleteGuestBusy by remember { mutableStateOf(false) }
+    var selectedGuestVmid by remember { mutableStateOf<Int?>(null) }
     var detailsVm by remember { mutableStateOf<ProxmoxVm?>(null) }
     var detailsConfig by remember { mutableStateOf<ProxmoxVmConfig?>(null) }
     var detailsLoading by remember { mutableStateOf(false) }
@@ -1238,7 +1239,14 @@ private fun Dashboard(
                     }
                 }
                 items(nodeVms, key = { it.node + "-" + it.type + "-" + it.vmid }) { vm ->
-                VmCard(vm, vmLoading, onVmAction, onConsole, onSnapshot, onDelete = { selected -> deleteGuestVm = selected; deleteGuestConfirmation = "" }, onEditConfig = { selected ->
+                if (selectedGuestVmid == vm.vmid) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { selectedGuestVmid = null }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Natrag na Guestove")
+                        }
+                        VmCard(vm, vmLoading, onVmAction, onConsole, onSnapshot, onDelete = { selected -> deleteGuestVm = selected; deleteGuestConfirmation = "" }, onEditConfig = { selected ->
                     editVm = selected
                 }, onSnapshots = { selected ->
                     snapshotsVm = selected
@@ -1299,6 +1307,10 @@ private fun Dashboard(
                         }
                     }
                 })
+                    }
+                } else {
+                    GuestListRow(vm = vm, onClick = { selectedGuestVmid = vm.vmid })
+                }
                 }
             }
             if (!vmLoading && vms.isEmpty()) item { Text("Nema pronađenih guestova (VM/LXC).") }
@@ -3032,6 +3044,36 @@ private fun VmCard(
             },
             dismissButton = { TextButton(onClick = { confirmAction = null }) { Text("Odustani") } }
         )
+    }
+}
+
+@Composable
+private fun GuestListRow(vm: ProxmoxVm, onClick: () -> Unit) {
+    val cpuPercent = (vm.cpu * 100.0).toFloat().coerceIn(0f, 100f)
+    val memoryPercent = if (vm.maxMem > 0L) (vm.mem.toDouble() / vm.maxMem.toDouble() * 100.0).toFloat().coerceIn(0f, 100f) else 0f
+    val darkCard = androidx.compose.ui.graphics.Color(0xFF1D1D1F)
+    val track = androidx.compose.ui.graphics.Color(0xFF38383B)
+    Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick), shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = darkCard)) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(if (vm.isQemu) Icons.Default.Dns else Icons.Default.Inventory2, contentDescription = null, tint = if (vm.isRunning) androidx.compose.ui.graphics.Color(0xFF35C759) else androidx.compose.ui.graphics.Color(0xFF77777A), modifier = Modifier.size(30.dp))
+                Spacer(Modifier.width(12.dp))
+                Text(vm.vmid.toString(), style = MaterialTheme.typography.titleMedium, color = androidx.compose.ui.graphics.Color(0xFFF2F2F7), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                Spacer(Modifier.width(18.dp))
+                Text(vm.name, style = MaterialTheme.typography.titleMedium, color = androidx.compose.ui.graphics.Color(0xFFE5E5EA), maxLines = 1, modifier = Modifier.weight(1f))
+                Icon(Icons.Default.ChevronRight, contentDescription = "Otvori " + vm.name, tint = androidx.compose.ui.graphics.Color(0xFF77777A))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    LinearProgressIndicator(progress = { cpuPercent / 100f }, modifier = Modifier.fillMaxWidth().height(5.dp), color = androidx.compose.ui.graphics.Color(0xFF35C759), trackColor = track)
+                    Text("CPU " + "%.0f".format(cpuPercent) + "% od " + vm.cpus + " CPU", style = MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color(0xFF98989D), maxLines = 1)
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    LinearProgressIndicator(progress = { memoryPercent / 100f }, modifier = Modifier.fillMaxWidth().height(5.dp), color = androidx.compose.ui.graphics.Color(0xFF35C759), trackColor = track)
+                    Text(memoryPercent.toInt().toString() + "% od " + formatBytes(vm.maxMem), style = MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color(0xFF98989D), maxLines = 1)
+                }
+            }
+        }
     }
 }
 
