@@ -1501,6 +1501,7 @@ private fun Dashboard(
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text(s.storage, style = MaterialTheme.typography.titleMedium)
                                 Text("${s.node} • ${s.type}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(if (s.enabled) "Omogućeno u Proxmoxu" else "Onemogućeno u Proxmoxu", style = MaterialTheme.typography.labelSmall, color = if (s.enabled) androidx.compose.ui.graphics.Color(0xFF65E6A2) else MaterialTheme.colorScheme.error)
                             }
                             Surface(shape = CircleShape, color = if (s.active) androidx.compose.ui.graphics.Color(0xFF123A2B) else androidx.compose.ui.graphics.Color(0xFF263139)) {
                                 Text(if (s.active) "AKTIVNO" else "NEAKTIVNO", modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp), style = MaterialTheme.typography.labelSmall, color = if (s.active) androidx.compose.ui.graphics.Color(0xFF65E6A2) else MaterialTheme.colorScheme.onSurfaceVariant)
