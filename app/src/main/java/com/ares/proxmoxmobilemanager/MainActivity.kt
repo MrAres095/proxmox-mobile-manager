@@ -3066,7 +3066,7 @@ private fun GuestListRow(vm: ProxmoxVm, onClick: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     LinearProgressIndicator(progress = { cpuPercent / 100f }, modifier = Modifier.fillMaxWidth().height(5.dp), color = androidx.compose.ui.graphics.Color(0xFF35C759), trackColor = track)
-                    Text("CPU " + "%.0f".format(cpuPercent) + "% od " + vm.cpus + " CPU", style = MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color(0xFF98989D), maxLines = 1)
+                    Text("CPU " + "%.0f".format(cpuPercent) + "%", style = MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color(0xFF98989D), maxLines = 1)
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     LinearProgressIndicator(progress = { memoryPercent / 100f }, modifier = Modifier.fillMaxWidth().height(5.dp), color = androidx.compose.ui.graphics.Color(0xFF35C759), trackColor = track)
