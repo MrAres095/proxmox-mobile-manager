@@ -21,7 +21,7 @@ kotlin {
 
 android {
     namespace = "com.ares.proxmoxmobilemanager"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.ares.proxmoxmobilemanager"
