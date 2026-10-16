@@ -2,6 +2,8 @@ package com.ares.proxmoxmobilemanager
 
 import android.os.Bundle
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -214,6 +216,7 @@ fun ProxmoxApp() {
                     onSettings = { showSettings = true },
                     onClusterManager = { showClusterManager = true },
                     onReplication = { showReplication = true; replicationLoading = true; scope.launch { try { replicationJobs = api.getReplicationJobs(connectedBase!!, connection) } catch (e: Exception) { error = e.message ?: "Replication se ne može učitati." } finally { replicationLoading = false } } },
+                    onWebUi = { try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(connectedBase!!))) } catch (e: Exception) { error = "Web UI se ne može otvoriti: ${e.message ?: "provjeri adresu servera"}" } },
                     onNodeOpen = { selectedNode = it },
                     onConsole = { consoleVm = it },
                     onSnapshot = { vm, snapName, description ->
@@ -737,6 +740,7 @@ private fun Dashboard(
     clusterStatus: ProxmoxClusterStatus?,
     onClusterManager: () -> Unit,
     onReplication: () -> Unit,
+    onWebUi: () -> Unit,
     onNodeOpen: (ProxmoxNode) -> Unit
 ) {
     val context = LocalContext.current
@@ -877,6 +881,7 @@ private fun Dashboard(
                 },
                 actions = {
                     IconButton(onClick = onRefresh, enabled = !loading && !vmLoading) { Icon(Icons.Default.Refresh, contentDescription = "Osvježi") }
+                    IconButton(onClick = onWebUi) { Icon(Icons.Default.OpenInBrowser, contentDescription = "Otvori Proxmox Web UI") }
                     IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, contentDescription = "Postavke") }
                 }
             )
