@@ -2885,7 +2885,16 @@ private fun NodeShellScreen(base: String, connection: ProxmoxConnection, node: P
                     backgroundColor = terminalBg, foregroundColor = terminalFg, keyboardEnabled = true, showSoftKeyboard = true
                 )
             }
-            if (imeVisible) Column(Modifier.fillMaxWidth().background(androidx.compose.ui.graphics.Color(0xFF202833)), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+            if (imeVisible) Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        color = androidx.compose.ui.graphics.Color(0xFF17212D),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+                    )
+                    .padding(horizontal = 3.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                     listOf("ESC" to "\u001b", "/" to "/", "-" to "-", "HOME" to "\u001b[H", "↑" to "\u001b[A", "END" to "\u001b[F", "PGUP" to "\u001b[5~").forEach { (label, sequence) ->
                         TextButton(onClick = { ctrlModifierActive = false; console.send(sequence); keyboardController?.show() }, enabled = connected, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp), modifier = Modifier.weight(1f).focusProperties { canFocus = false }) { Text(label, maxLines = 1, color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.labelMedium) }
@@ -3342,6 +3351,17 @@ private fun ConsoleScreen(base:String,connection:ProxmoxConnection,vm:ProxmoxVm,
             actions={
                 Text(if(connected)"● LIVE" else if(connecting)"○ spajanje" else "○ offline",Modifier.padding(end=2.dp),style=MaterialTheme.typography.labelSmall,color=if(connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                 IconButton(onClick={connect()},enabled=!connecting){Icon(Icons.Default.Refresh,contentDescription="Ponovno poveži konzolu")}
+                IconButton(
+                    onClick = {
+                        val text = clipboard.getText()?.text
+                        if (connected && !text.isNullOrEmpty()) {
+                            console.send(text)
+                            terminalFocusRequester.requestFocus()
+                            keyboardController?.show()
+                        }
+                    },
+                    enabled = connected && !clipboard.getText()?.text.isNullOrEmpty()
+                ) { Icon(Icons.Default.ContentPaste, contentDescription = "Zalijepi iz međuspremnika") }
                 IconButton(onClick={terminalFocusRequester.requestFocus();keyboardController?.show()}){Icon(Icons.Default.Keyboard,contentDescription="Prikaži tipkovnicu")}
                 IconButton(onClick={terminalEmulator::clearScreen}){Icon(Icons.Default.DeleteSweep,contentDescription="Očisti terminal")}
             }
