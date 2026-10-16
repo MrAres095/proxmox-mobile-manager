@@ -2,6 +2,14 @@ package com.ares.proxmoxmobilemanager
 
 import android.os.Bundle
 import android.content.Context
+import android.graphics.Bitmap
+import android.net.http.SslError
+import android.webkit.SslErrorHandler
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -68,6 +76,7 @@ fun ProxmoxApp() {
     MaterialTheme(colorScheme = appColors) {
         Surface(modifier = Modifier.fillMaxSize()) {
             var showSettings by remember { mutableStateOf(true) }
+            var showWebUi by remember { mutableStateOf(false) }
             var showClusterManager by remember { mutableStateOf(false) }
             var showReplication by remember { mutableStateOf(false) }
             var selectedNode by remember { mutableStateOf<ProxmoxNode?>(null) }
@@ -96,7 +105,7 @@ fun ProxmoxApp() {
             var connection by remember { mutableStateOf(ProxmoxConnection(prefs.getString("localUrl", "") ?: "", prefs.getString("remoteUrl", "") ?: "", prefs.getString("username", "") ?: "", prefs.getString("password", "") ?: "", prefs.getString("tokenId", "") ?: "", prefs.getString("tokenSecret", "") ?: "")) }
             val scope = rememberCoroutineScope()
 
-            if (consoleVm != null && connectedBase != null) { ConsoleScreen(connectedBase!!, connection, consoleVm!!, { console.close(); consoleVm=null }) } else if (showSettings || connectedBase == null) {
+            if (showWebUi && connectedBase != null) { ProxmoxWebUiScreen(base = connectedBase!!, onBack = { showWebUi = false }) } else if (consoleVm != null && connectedBase != null) { ConsoleScreen(connectedBase!!, connection, consoleVm!!, { console.close(); consoleVm=null }) } else if (showSettings || connectedBase == null) {
                 ConnectionScreen(
                     connection, loading, error, profiles, selectedProfile,
                     onThemeSettings = { showUiSettings = true },
@@ -212,6 +221,7 @@ fun ProxmoxApp() {
                         }
                     },
                     onSettings = { showSettings = true },
+                    onOpenWebUi = { showWebUi = true },
                     onClusterManager = { showClusterManager = true },
                     onReplication = { showReplication = true; replicationLoading = true; scope.launch { try { replicationJobs = api.getReplicationJobs(connectedBase!!, connection) } catch (e: Exception) { error = e.message ?: "Replication se ne može učitati." } finally { replicationLoading = false } } },
                     onNodeOpen = { selectedNode = it },
@@ -282,6 +292,111 @@ fun ProxmoxApp() {
         }
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProxmoxWebUiScreen(base: String, onBack: () -> Unit) {
+    val context = LocalContext.current
+    var pageTitle by remember { mutableStateOf("Proxmox Web UI") }
+    var loading by remember { mutableStateOf(true) }
+    var pageError by remember { mutableStateOf<String?>(null) }
+    val expectedHost = remember(base) {
+        runCatching { java.net.URI(base).host?.lowercase() }.getOrNull()
+    }
+    val webView = remember(base) {
+        WebView(context).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.databaseEnabled = true
+            settings.loadsImagesAutomatically = true
+            settings.javaScriptCanOpenWindowsAutomatically = true
+            settings.setSupportMultipleWindows(true)
+            settings.useWideViewPort = true
+            settings.loadWithOverviewMode = true
+            settings.builtInZoomControls = true
+            settings.displayZoomControls = false
+            settings.allowFileAccess = false
+            settings.allowContentAccess = false
+            webChromeClient = object : WebChromeClient() {
+                override fun onReceivedTitle(view: WebView?, title: String?) {
+                    if (!title.isNullOrBlank()) pageTitle = title
+                }
+                override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                    loading = newProgress < 100
+                }
+            }
+            webViewClient = object : WebViewClient() {
+                override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                    loading = true
+                    pageError = null
+                }
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    loading = false
+                    pageError = null
+                }
+                override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: android.webkit.WebResourceError?) {
+                    if (request?.isForMainFrame == true) {
+                        loading = false
+                        pageError = error?.description?.toString() ?: "Stranica se ne može učitati."
+                    }
+                }
+                override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
+                    val errorHost = runCatching { java.net.URI(error?.url ?: "").host?.lowercase() }.getOrNull()
+                    // Proxmox commonly uses a self-signed certificate on LAN. Only allow it
+                    // for the exact host the user configured; never for a different host.
+                    if (expectedHost != null && errorHost == expectedHost) handler?.proceed()
+                    else handler?.cancel()
+                }
+                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                    val url = request?.url ?: return false
+                    return url.scheme !in listOf("http", "https")
+                }
+            }
+            loadUrl(base.trimEnd('/') + "/")
+        }
+    }
+    DisposableEffect(webView) {
+        onDispose { webView.stopLoading(); webView.destroy() }
+    }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(pageTitle, maxLines = 1)
+                        Text(base, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    }
+                },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Natrag u aplikaciju") } },
+                actions = {
+                    IconButton(onClick = { if (webView.canGoBack()) webView.goBack() }, enabled = webView.canGoBack()) { Icon(Icons.Default.ArrowBack, contentDescription = "Natrag na web stranici") }
+                    IconButton(onClick = { loading = true; pageError = null; webView.reload() }) { Icon(Icons.Default.Refresh, contentDescription = "Osvježi web sučelje") }
+                    IconButton(onClick = { webView.evaluateJavascript("document.documentElement.style.zoom = (parseFloat(document.documentElement.style.zoom || '1') + 0.1).toString()", null) }) { Icon(Icons.Default.ZoomIn, contentDescription = "Povećaj web stranicu") }
+                    IconButton(onClick = { webView.evaluateJavascript("document.documentElement.style.zoom = Math.max(0.6, parseFloat(document.documentElement.style.zoom || '1') - 0.1).toString()", null) }) { Icon(Icons.Default.ZoomOut, contentDescription = "Smanji web stranicu") }
+                }
+            )
+        }
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (pageError != null) {
+                Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Web sučelje nije učitano", style = MaterialTheme.typography.titleSmall)
+                        Text(pageError!!, style = MaterialTheme.typography.bodySmall)
+                        Text("Provjeri mrežnu vezu i certifikat Proxmox servera.", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+            AndroidView(
+                factory = { webView },
+                modifier = Modifier.fillMaxSize(),
+                update = { view -> if (view.url.isNullOrBlank()) view.loadUrl(base.trimEnd('/') + "/") }
+            )
+        }
+    }
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -727,6 +842,7 @@ private fun Dashboard(
     onVmAction: (ProxmoxVm, VmAction) -> Unit,
     onRefresh: () -> Unit,
     onSettings: () -> Unit,
+    onOpenWebUi: () -> Unit,
     onConsole: (ProxmoxVm) -> Unit,
     onSnapshot: (ProxmoxVm, String, String) -> Unit,
     onBackup: (ProxmoxVm) -> Unit,
@@ -877,6 +993,7 @@ private fun Dashboard(
                 },
                 actions = {
                     IconButton(onClick = onRefresh, enabled = !loading && !vmLoading) { Icon(Icons.Default.Refresh, contentDescription = "Osvježi") }
+                    IconButton(onClick = onOpenWebUi) { Icon(Icons.Default.Language, contentDescription = "Otvori Proxmox web sučelje") }
                     IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, contentDescription = "Postavke") }
                 }
             )
