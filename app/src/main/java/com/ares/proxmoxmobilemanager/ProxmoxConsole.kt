@@ -111,8 +111,18 @@ class ProxmoxConsole(
                 .apply { authHeaders.forEach { (k, v) -> header(k, v) } }
                 .build()
 
-            val ws = client.newWebSocket(req, listener(session.third, session.second, onData, onClosed, onError))
+            val opened = CompletableDeferred<Unit>()
+            val ws = client.newWebSocket(
+                req,
+                listener(
+                    session.third, session.second, onData, onClosed, onError,
+                    opened = opened,
+                    onOpenCallback = { onData("OK".toByteArray(Charsets.UTF_8)) }
+                )
+            )
             socket = ws
+            // Keep the console marked as connecting until the WebSocket handshake succeeds.
+            opened.await()
         } catch (e: Throwable) {
             client.dispatcher.cancelAll()
             client.connectionPool.evictAll()
