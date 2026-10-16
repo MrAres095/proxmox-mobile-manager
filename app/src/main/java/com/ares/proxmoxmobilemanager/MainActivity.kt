@@ -767,6 +767,9 @@ private fun Dashboard(
     var detailsConfig by remember { mutableStateOf<ProxmoxVmConfig?>(null) }
     var detailsLoading by remember { mutableStateOf(false) }
     var detailsError by remember { mutableStateOf<String?>(null) }
+    var detailsIps by remember { mutableStateOf<List<String>>(emptyList()) }
+    var detailsIpLoading by remember { mutableStateOf(false) }
+    var detailsIpMessage by remember { mutableStateOf<String?>(null) }
     var editVm by remember { mutableStateOf<ProxmoxVm?>(null) }
     var snapshotsVm by remember { mutableStateOf<ProxmoxVm?>(null) }
     var snapshots by remember { mutableStateOf<List<Pair<String,String>>>(emptyList()) }
@@ -1342,6 +1345,9 @@ private fun Dashboard(
                     detailsVm = selected
                     detailsConfig = null
                     detailsError = null
+                    detailsIps = emptyList()
+                    detailsIpMessage = null
+                    detailsIpLoading = true
                     detailsLoading = true
                     scope.launch {
                         try {
@@ -1350,6 +1356,20 @@ private fun Dashboard(
                             detailsError = e.message ?: "Konfiguraciju nije moguće učitati."
                         } finally {
                             detailsLoading = false
+                        }
+                        try {
+                            detailsIps = api.getGuestIpAddresses(base, connection, selected)
+                            detailsIpMessage = if (!selected.isRunning) "Guest je zaustavljen." else if (detailsIps.isEmpty()) {
+                                if (selected.isQemu) "Nema IP adresa. Provjeri je li QEMU Guest Agent instaliran i omogućen." else "Proxmox nije vratio IP adrese za ovaj LXC."
+                            } else null
+                        } catch (e: Exception) {
+                            detailsIpMessage = if (!selected.isRunning) "Guest je zaustavljen." else if (selected.isQemu) {
+                                "IP adrese nisu dostupne. Za VM treba biti instaliran i uključen QEMU Guest Agent."
+                            } else {
+                                "IP adrese ovog LXC-a trenutno nije moguće dohvatiti."
+                            }
+                        } finally {
+                            detailsIpLoading = false
                         }
                     }
                 })
@@ -1951,6 +1971,29 @@ private fun Dashboard(
                 text = {
                     Column(Modifier.fillMaxWidth()) {
                         Text("${vm.type.uppercase()} • VMID ${vm.vmid} • ${vm.node}", style = MaterialTheme.typography.bodySmall)
+                        Spacer(Modifier.height(8.dp))
+                        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Lan, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(7.dp))
+                                    Text("IP adrese", style = MaterialTheme.typography.titleSmall)
+                                }
+                                when {
+                                    detailsIpLoading -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                        Text("Dohvaćam IP adrese…", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    detailsIps.isNotEmpty() -> detailsIps.forEach { ip ->
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(ip, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                                            IconButton(onClick = { scope.launch { androidx.compose.ui.platform.LocalClipboardManager.current } }) { }
+                                        }
+                                    }
+                                    else -> Text(detailsIpMessage ?: "IP adresa nije dostupna.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
                         Spacer(Modifier.height(8.dp))
                         when {
                             detailsLoading -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
