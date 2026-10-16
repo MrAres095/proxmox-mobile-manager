@@ -86,6 +86,8 @@ fun ProxmoxApp() {
             var loading by remember { mutableStateOf(false) }
             var error by remember { mutableStateOf<String?>(null) }
             var updatingAll by remember { mutableStateOf(false) }
+            var loginUpdateBusy by remember { mutableStateOf(false) }
+            var loginUpdateMessage by remember { mutableStateOf<String?>(null) }
             var updateStatuses by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
             val context = LocalContext.current
             val prefs = remember { context.getSharedPreferences("proxmox_connection", Context.MODE_PRIVATE) }
@@ -98,6 +100,32 @@ fun ProxmoxApp() {
                 ConnectionScreen(
                     connection, loading, error, profiles, selectedProfile,
                     onThemeSettings = { showUiSettings = true },
+                    onUpdate = {
+                        scope.launch {
+                            val updater = UpdateManager(context)
+                            try {
+                                loginUpdateBusy = true
+                                loginUpdateMessage = "Provjeravam GitHub Release..."
+                                val available = updater.checkForUpdate()
+                                if (available == null) {
+                                    loginUpdateMessage = "Aplikacija je ažurirana ili GitHub trenutno nije dostupan."
+                                } else if (!updater.canInstallUnknownApps()) {
+                                    loginUpdateMessage = "Dozvoli instalaciju za aplikaciju, pa ponovno pritisni Ažuriraj."
+                                    updater.openInstallPermissionSettings()
+                                } else {
+                                    loginUpdateMessage = "Preuzimam verziju ${available.versionName}..."
+                                    updater.downloadAndInstall(available)
+                                    loginUpdateMessage = "APK je preuzet. Dovrši instalaciju u Android prozoru."
+                                }
+                            } catch (e: Exception) {
+                                loginUpdateMessage = e.message ?: "Ažuriranje nije uspjelo."
+                            } finally {
+                                loginUpdateBusy = false
+                            }
+                        }
+                    },
+                    updateBusy = loginUpdateBusy,
+                    updateMessage = loginUpdateMessage,
                     onSaveProfile = { profileName, newConnection ->
                         selectedProfile = profileName
                         connection = newConnection
@@ -296,6 +324,9 @@ private fun ConnectionScreen(
     profiles: List<ProxmoxServerProfile>,
     selectedProfile: String,
     onThemeSettings: () -> Unit = {},
+    onUpdate: () -> Unit = {},
+    updateBusy: Boolean = false,
+    updateMessage: String? = null,
     onSaveProfile: (String, ProxmoxConnection) -> Unit,
     onDeleteProfile: (String) -> Unit,
     onConnect: (String, ProxmoxConnection) -> Unit
@@ -358,7 +389,13 @@ private fun ConnectionScreen(
                         }
                     }
                 },
-                actions = { IconButton(onClick = onThemeSettings) { Icon(Icons.Default.Palette, contentDescription = "Izgled") } }
+                actions = {
+                    IconButton(onClick = onUpdate, enabled = !loading && !updateBusy) {
+                        if (updateBusy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        else Icon(Icons.Default.SystemUpdate, contentDescription = "Ažuriraj aplikaciju")
+                    }
+                    IconButton(onClick = onThemeSettings) { Icon(Icons.Default.Palette, contentDescription = "Izgled") }
+                }
             )
         },
         bottomBar = {
@@ -397,6 +434,15 @@ private fun ConnectionScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            if (updateMessage != null) {
+                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                    Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.SystemUpdate, contentDescription = null)
+                        Text(updateMessage, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                        IconButton(onClick = { /* message clears on next update attempt */ }) { Icon(Icons.Default.Info, contentDescription = null) }
+                    }
+                }
+            }
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,
