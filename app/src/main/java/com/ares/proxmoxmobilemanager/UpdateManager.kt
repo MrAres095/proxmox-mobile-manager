@@ -46,14 +46,14 @@ class UpdateManager(private val context: Context) {
 
     suspend fun downloadAndInstall(update: AppUpdate) = withContext(Dispatchers.IO) {
         val dir = File(context.cacheDir, "updates").apply { mkdirs() }
-        val apk = File(dir, "proxmox-mobile-manager-${'$'}{update.versionName}.apk")
+        val apk = File(dir, "proxmox-mobile-manager-${update.versionName}.apk")
         val connection = (URL(update.downloadUrl).openConnection() as HttpURLConnection).apply {
             connectTimeout = 10000; readTimeout = 30000; requestMethod = "GET"
             setRequestProperty("User-Agent", "Proxmox-Mobile-Manager")
             setRequestProperty("Accept", "application/octet-stream")
         }
         try {
-            if (connection.responseCode !in 200..299) throw IllegalStateException("Preuzimanje ažuriranja nije uspjelo (HTTP ${'$'}{connection.responseCode}).")
+            if (connection.responseCode !in 200..299) throw IllegalStateException("Preuzimanje ažuriranja nije uspjelo (HTTP ${connection.responseCode}).")
             connection.inputStream.use { input -> apk.outputStream().use { output -> input.copyTo(output) } }
         } finally { connection.disconnect() }
         withContext(Dispatchers.Main) { installApk(apk) }
