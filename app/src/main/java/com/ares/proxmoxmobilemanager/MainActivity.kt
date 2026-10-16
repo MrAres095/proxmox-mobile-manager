@@ -1985,10 +1985,7 @@ private fun Dashboard(
                                         Text("Dohvaćam IP adrese…", style = MaterialTheme.typography.bodySmall)
                                     }
                                     detailsIps.isNotEmpty() -> detailsIps.forEach { ip ->
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(ip, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                                            IconButton(onClick = { scope.launch { androidx.compose.ui.platform.LocalClipboardManager.current } }) { }
-                                        }
+                                        Text(ip, style = MaterialTheme.typography.bodyMedium)
                                     }
                                     else -> Text(detailsIpMessage ?: "IP adresa nije dostupna.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
