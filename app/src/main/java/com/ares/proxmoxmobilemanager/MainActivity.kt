@@ -1261,8 +1261,8 @@ private fun Dashboard(
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = resourceTypeFilter == "all", onClick = { resourceTypeFilter = "all" }, label = { Text("VM + LXC (${vms.size})") })
-                    FilterChip(selected = resourceTypeFilter == "vm", onClick = { resourceTypeFilter = "vm" }, label = { Text("Virtualne mašine (${vms.count { it.type.equals(\"qemu\", true) || it.type.equals(\"vm\", true) }})") })
-                    FilterChip(selected = resourceTypeFilter == "lxc", onClick = { resourceTypeFilter = "lxc" }, label = { Text("LXC (${vms.count { it.type.equals(\"lxc\", true) }})") })
+                    FilterChip(selected = resourceTypeFilter == "vm", onClick = { resourceTypeFilter = "vm" }, label = { Text("Virtualne mašine (${vms.count { it.type.equals("qemu", true) || it.type.equals("vm", true) }})") })
+                    FilterChip(selected = resourceTypeFilter == "lxc", onClick = { resourceTypeFilter = "lxc" }, label = { Text("LXC (${vms.count { it.type.equals("lxc", true) }})") })
                 }
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = resourceStatusFilter == "all", onClick = { resourceStatusFilter = "all" }, label = { Text("Svi statusi") })
