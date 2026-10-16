@@ -486,6 +486,56 @@ class ProxmoxApi {
             })
         }
 
+    /**
+     * Reads guest IP addresses. QEMU uses the QEMU guest agent; LXC uses the Proxmox interfaces endpoint.
+     */
+    suspend fun getGuestIpAddresses(base: String, connection: ProxmoxConnection, vm: ProxmoxVm): List<String> =
+        withContext(Dispatchers.IO) {
+            if (!vm.isRunning) return@withContext emptyList()
+            val endpoint = if (vm.isQemu) "qemu" else "lxc"
+            val path = if (vm.isQemu) {
+                "/api2/json/nodes/${URLEncoder.encode(vm.node, "UTF-8")}/qemu/${vm.vmid}/agent/network-get-interfaces"
+            } else {
+                "/api2/json/nodes/${URLEncoder.encode(vm.node, "UTF-8")}/lxc/${vm.vmid}/interfaces"
+            }
+            val data = request(base, path, connection, 7000).optJSONObject("data")
+            val result = data?.optJSONArray("result")
+            val addresses = linkedSetOf<String>()
+            if (result != null) {
+                for (i in 0 until result.length()) {
+                    val iface = result.optJSONObject(i) ?: continue
+                    val ips = iface.optJSONArray("ip-addresses") ?: continue
+                    for (j in 0 until ips.length()) {
+                        val ip = ips.optJSONObject(j) ?: continue
+                        val address = ip.optString("ip-address").trim()
+                        val type = ip.optString("ip-address-type")
+                        if (address.isNotBlank() && address != "127.0.0.1" && address != "::1" &&
+                            !address.startsWith("169.254.") && !address.startsWith("fe80:") &&
+                            (type.isBlank() || type.equals("ipv4", true) || type.equals("ipv6", true))) {
+                            addresses.add(address)
+                        }
+                    }
+                }
+            }
+            // LXC interfaces responses commonly expose inet/inet6 arrays directly per interface.
+            val interfaces = data?.optJSONArray("interfaces")
+            if (interfaces != null) {
+                for (i in 0 until interfaces.length()) {
+                    val iface = interfaces.optJSONObject(i) ?: continue
+                    for (key in listOf("inet", "inet6")) {
+                        val list = iface.optJSONArray(key) ?: continue
+                        for (j in 0 until list.length()) {
+                            val item = list.optJSONObject(j) ?: continue
+                            val address = item.optString("address").trim()
+                            if (address.isNotBlank() && address != "127.0.0.1" && address != "::1" &&
+                                !address.startsWith("169.254.") && !address.startsWith("fe80:")) addresses.add(address)
+                        }
+                    }
+                }
+            }
+            addresses.toList().sorted()
+        }
+
     suspend fun startVm(base: String, connection: ProxmoxConnection, vm: ProxmoxVm) {
         postAction(base, connection, vm, "start")
     }
