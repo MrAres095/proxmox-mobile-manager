@@ -1725,7 +1725,7 @@ private fun Dashboard(
         val nodeName = nodeTasksNode!!
         AlertDialog(
             onDismissRequest = { if (!nodeTasksLoading) nodeTasksNode = null },
-            title = { Text("$" + "{nodeName} • Povijest zadataka") },
+            title = { Text("$nodeName • Povijest zadataka") },
             text = {
                 when {
                     nodeTasksLoading -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
