@@ -44,23 +44,23 @@ class MainActivity : ComponentActivity() {
 fun ProxmoxApp() {
     val context = LocalContext.current
     val uiPrefs = remember { context.getSharedPreferences("ui_preferences", Context.MODE_PRIVATE) }
-    var theme by remember { mutableStateOf(uiPrefs.getString("theme", "system") ?: "system") }
+    var theme by remember { mutableStateOf(uiPrefs.getString("theme", "dark") ?: "dark") }
     val dark = when (theme) {
         "light" -> false
         "dark" -> true
         else -> isSystemInDarkTheme()
     }
     val appColors = if (dark) darkColorScheme(
-        primary = androidx.compose.ui.graphics.Color(0xFF38D6E8),
-        onPrimary = androidx.compose.ui.graphics.Color(0xFF04171B),
-        secondary = androidx.compose.ui.graphics.Color(0xFF65E6A2),
-        background = androidx.compose.ui.graphics.Color(0xFF070B12),
-        surface = androidx.compose.ui.graphics.Color(0xFF101722),
-        surfaceVariant = androidx.compose.ui.graphics.Color(0xFF182331),
-        onSurface = androidx.compose.ui.graphics.Color(0xFFF0F6FC),
-        onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFF9BAFC2),
-        outline = androidx.compose.ui.graphics.Color(0xFF2B3B4D),
-        outlineVariant = androidx.compose.ui.graphics.Color(0xFF223142)
+        primary = androidx.compose.ui.graphics.Color(0xFF007AFF),
+        onPrimary = androidx.compose.ui.graphics.Color(0xFFFFFFFF),
+        secondary = androidx.compose.ui.graphics.Color(0xFF34C759),
+        background = androidx.compose.ui.graphics.Color(0xFF000000),
+        surface = androidx.compose.ui.graphics.Color(0xFF1C1C1E),
+        surfaceVariant = androidx.compose.ui.graphics.Color(0xFF1C1C1E),
+        onSurface = androidx.compose.ui.graphics.Color(0xFFE5E5EA),
+        onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFF8E8E93),
+        outline = androidx.compose.ui.graphics.Color(0xFF38383A),
+        outlineVariant = androidx.compose.ui.graphics.Color(0xFF2C2C2E)
     ) else lightColorScheme(
         primary = androidx.compose.ui.graphics.Color(0xFF007C91),
         secondary = androidx.compose.ui.graphics.Color(0xFF16894F)
