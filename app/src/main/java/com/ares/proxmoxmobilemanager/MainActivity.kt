@@ -2033,6 +2033,10 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
     }
 
     fun loadSelectedTab() {
+        if (!node.status.equals("online", true)) {
+            message = "Node '${node.node}' je offline ili nedostupan. Provjeri napajanje i mrežu; ostali čvorovi klastera mogu i dalje raditi."
+            return
+        }
         busy = true
         scope.launch {
             try {
@@ -2066,7 +2070,10 @@ private fun NodeManagementDialog(base: String, connection: ProxmoxConnection, no
             } finally { taskLogBusy = false }
         }
     }
-    LaunchedEffect(tab) { if (tab != "summary") loadSelectedTab() }
+    LaunchedEffect(tab, node.node, node.status) {
+        if (tab != "summary" && node.status.equals("online", true)) loadSelectedTab()
+        else if (tab != "summary") message = "Node '${node.node}' je offline ili nedostupan. Podaci ovog čvora neće se učitavati dok se ne vrati online."
+    }
 
     Scaffold(
         topBar = {
