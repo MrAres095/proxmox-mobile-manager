@@ -1304,7 +1304,17 @@ private fun Dashboard(
                         }
                     }
                 }
-                items(nodeVms, key = { it.node + "-" + it.type + "-" + it.vmid }) { vm ->
+                nodeVms.groupBy { if (it.type.equals("lxc", ignoreCase = true)) "LXC kontejneri" else "Virtualne mašine" }.forEach { (typeTitle, typedVms) ->
+                    item(key = "resource-type-$nodeName-$typeTitle") {
+                        Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(if (typeTitle == "LXC kontejneri") Icons.Default.Dns else Icons.Default.Computer, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(17.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(typeTitle, style = MaterialTheme.typography.titleSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                            Spacer(Modifier.width(8.dp))
+                            Text("(${typedVms.size})", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                items(typedVms, key = { it.node + "-" + it.type + "-" + it.vmid }) { vm ->
                 if (selectedGuestVmid == vm.vmid) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { selectedGuestVmid = null }, modifier = Modifier.fillMaxWidth()) {
@@ -1393,6 +1403,8 @@ private fun Dashboard(
                     }
                 } else {
                     GuestListRow(vm = vm, onClick = { selectedGuestVmid = vm.vmid })
+                }
+                }
                 }
                 }
             }
