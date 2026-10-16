@@ -498,8 +498,10 @@ class ProxmoxApi {
             } else {
                 "/api2/json/nodes/${URLEncoder.encode(vm.node, "UTF-8")}/lxc/${vm.vmid}/interfaces"
             }
-            val data = request(base, path, connection, 7000).optJSONObject("data")
-            val result = data?.optJSONArray("result")
+            val response = request(base, path, connection, 7000)
+            val data = response.optJSONObject("data")
+            val dataArray = response.optJSONArray("data")
+            val result = data?.optJSONArray("result") ?: dataArray
             val addresses = linkedSetOf<String>()
             if (result != null) {
                 for (i in 0 until result.length()) {
@@ -518,7 +520,7 @@ class ProxmoxApi {
                 }
             }
             // LXC interfaces responses commonly expose inet/inet6 arrays directly per interface.
-            val interfaces = data?.optJSONArray("interfaces")
+            val interfaces = data?.optJSONArray("interfaces") ?: dataArray
             if (interfaces != null) {
                 for (i in 0 until interfaces.length()) {
                     val iface = interfaces.optJSONObject(i) ?: continue
