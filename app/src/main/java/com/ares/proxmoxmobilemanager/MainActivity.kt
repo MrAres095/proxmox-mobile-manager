@@ -1407,7 +1407,6 @@ private fun Dashboard(
                 }
                 }
                 }
-            }
             if (!vmLoading && vms.isEmpty()) item { Text("Nema pronađenih guestova (VM/LXC).") }
             else if (!vmLoading && filteredVms.isEmpty()) item { Text("Nijedan guest ne odgovara pretrazi i odabranom filtru.") }
 
