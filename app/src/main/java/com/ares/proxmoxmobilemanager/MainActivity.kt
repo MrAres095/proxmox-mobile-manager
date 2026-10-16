@@ -887,6 +887,7 @@ private fun Dashboard(
                 NavigationBarItem(selected = selectedTab == "guests", onClick = { selectedTab = "guests" }, icon = { Icon(Icons.Default.Dns, null) }, label = { Text("Guestovi") })
                 NavigationBarItem(selected = selectedTab == "storage", onClick = { selectedTab = "storage" }, icon = { Icon(Icons.Default.Storage, null) }, label = { Text("Pohrana") })
                 NavigationBarItem(selected = selectedTab == "nodes", onClick = { selectedTab = "nodes" }, icon = { Icon(Icons.Default.Computer, null) }, label = { Text("Nodeovi") })
+                NavigationBarItem(selected = selectedTab == "cluster", onClick = { selectedTab = "cluster" }, icon = { Icon(Icons.Default.Hub, null) }, label = { Text("Cluster") })
             }
         }
     ) { padding ->
@@ -1382,6 +1383,82 @@ private fun Dashboard(
             if (!vmLoading && vms.isEmpty()) item { Text("Nema pronađenih guestova (VM/LXC).") }
             else if (!vmLoading && filteredVms.isEmpty()) item { Text("Nijedan guest ne odgovara pretrazi i odabranom filtru.") }
 
+            }
+
+            if (selectedTab == "cluster") {
+                item {
+                    Card(
+                        Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.extraLarge,
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(
+                                    modifier = Modifier.size(48.dp),
+                                    shape = MaterialTheme.shapes.large,
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Hub, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(27.dp))
+                                    }
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Text("CLUSTER", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.5.sp)
+                                    Text("Upravljanje klasterom", style = MaterialTheme.typography.titleLarge)
+                                    Text("Pregled čvorova i administracija kroz nativne Android ekrane.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Surface(Modifier.weight(1f), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
+                                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Icon(Icons.Default.Computer, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                        Text("Čvorovi", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(nodes.size.toString(), style = MaterialTheme.typography.headlineMedium)
+                                    }
+                                }
+                                Surface(Modifier.weight(1f), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
+                                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = androidx.compose.ui.graphics.Color(0xFF35D07F))
+                                        Text("Dostupni", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(nodes.count { it.status.equals("online", true) }.toString(), style = MaterialTheme.typography.headlineMedium, color = androidx.compose.ui.graphics.Color(0xFF35D07F))
+                                    }
+                                }
+                                Surface(Modifier.weight(1f), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
+                                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Icon(Icons.Default.Dns, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
+                                        Text("Guestovi", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(vms.size.toString(), style = MaterialTheme.typography.headlineMedium)
+                                    }
+                                }
+                            }
+                            if (clusterStatus == null) {
+                                Text("Status klastera još nije učitan. Osvježi podatke kako bi aplikacija ponovno dohvatila stanje.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            } else {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = androidx.compose.ui.graphics.Color(0xFF35D07F))
+                                    Text("Podaci o klasteru uspješno su dohvaćeni preko Proxmox API-ja.", style = MaterialTheme.typography.bodyMedium)
+                                }
+                            }
+                            Button(onClick = onClusterManager, modifier = Modifier.fillMaxWidth()) {
+                                Icon(Icons.Default.AccountTree, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Otvori upravljanje klasterom")
+                            }
+                            OutlinedButton(onClick = onReplication, modifier = Modifier.fillMaxWidth()) {
+                                Icon(Icons.Default.Sync, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Replication jobovi")
+                            }
+                            OutlinedButton(onClick = { selectedTab = "nodes" }, modifier = Modifier.fillMaxWidth()) {
+                                Icon(Icons.Default.Computer, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Prikaži sve nodeove")
+                            }
+                        }
+                    }
+                }
             }
 
             if (selectedTab == "nodes") {
