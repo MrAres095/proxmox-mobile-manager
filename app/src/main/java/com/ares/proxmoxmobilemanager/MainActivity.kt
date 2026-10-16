@@ -802,6 +802,7 @@ private fun Dashboard(
     var nodeTasksLoading by remember { mutableStateOf(false) }
     var resourceQuery by remember { mutableStateOf("") }
     var resourceStatusFilter by remember { mutableStateOf("all") }
+    var resourceTypeFilter by remember { mutableStateOf("all") }
     var resourceSort by remember { mutableStateOf("node") }
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var storageQuery by remember { mutableStateOf("") }
@@ -816,7 +817,12 @@ private fun Dashboard(
             "stopped" -> !vm.status.equals("running", ignoreCase = true)
             else -> true
         }
-        matchesQuery && matchesStatus
+        val matchesType = when (resourceTypeFilter) {
+            "vm" -> vm.type.equals("qemu", ignoreCase = true) || vm.type.equals("vm", ignoreCase = true)
+            "lxc" -> vm.type.equals("lxc", ignoreCase = true)
+            else -> true
+        }
+        matchesQuery && matchesStatus && matchesType
     }
     val orderedVms = when (resourceSort) {
         "name" -> filteredVms.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
@@ -1253,8 +1259,13 @@ private fun Dashboard(
                     trailingIcon = { if (resourceQuery.isNotEmpty()) IconButton(onClick = { resourceQuery = "" }) { Icon(Icons.Default.Close, contentDescription = "Očisti pretragu") } }
                 )
                 Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = resourceStatusFilter == "all", onClick = { resourceStatusFilter = "all" }, label = { Text("Sve (${vms.size})") })
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = resourceTypeFilter == "all", onClick = { resourceTypeFilter = "all" }, label = { Text("VM + LXC (${vms.size})") })
+                    FilterChip(selected = resourceTypeFilter == "vm", onClick = { resourceTypeFilter = "vm" }, label = { Text("Virtualne mašine (${vms.count { it.type.equals(\"qemu\", true) || it.type.equals(\"vm\", true) }})") })
+                    FilterChip(selected = resourceTypeFilter == "lxc", onClick = { resourceTypeFilter = "lxc" }, label = { Text("LXC (${vms.count { it.type.equals(\"lxc\", true) }})") })
+                }
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = resourceStatusFilter == "all", onClick = { resourceStatusFilter = "all" }, label = { Text("Svi statusi") })
                     FilterChip(selected = resourceStatusFilter == "running", onClick = { resourceStatusFilter = "running" }, label = { Text("Pokrenute") })
                     FilterChip(selected = resourceStatusFilter == "stopped", onClick = { resourceStatusFilter = "stopped" }, label = { Text("Zaustavljene") })
                 }
