@@ -161,7 +161,18 @@ class ProxmoxConsole(
             .header("Referer", nodeConsoleReferer(base, node))
             .apply { authHeaders.forEach { (k, v) -> header(k, v) } }
             .build()
-        socket = client.newWebSocket(req, listener(session.third, session.second, onData, onClosed, onError))
+        val opened = CompletableDeferred<Unit>()
+        socket = client.newWebSocket(
+            req,
+            listener(
+                session.third, session.second, onData, onClosed, onError,
+                opened = opened,
+                onOpenCallback = { onData("OK".toByteArray(Charsets.UTF_8)) }
+            )
+        )
+        // Keep the caller's connecting state active until the WebSocket handshake completes.
+        // Otherwise the UI retry loop closes the socket before it can become live.
+        opened.await()
     }
 
     suspend fun upgradeNode(
@@ -236,11 +247,15 @@ class ProxmoxConsole(
         ticket: String,
         onData: (ByteArray) -> Unit,
         onClosed: (String?) -> Unit,
-        onError: (Throwable) -> Unit
+        onError: (Throwable) -> Unit,
+        opened: CompletableDeferred<Unit>? = null,
+        onOpenCallback: (() -> Unit)? = null
     ) = object : WebSocketListener() {
         override fun onOpen(ws: WebSocket, res: Response) {
             ws.send(user + ":" + ticket + "\n")
             ws.send("1:120:32:")
+            opened?.complete(Unit)
+            onOpenCallback?.invoke()
         }
         override fun onMessage(ws: WebSocket, b: okio.ByteString) {
             onData(b.toByteArray())
@@ -249,6 +264,7 @@ class ProxmoxConsole(
             onData(t.toByteArray(Charsets.UTF_8))
         }
         override fun onFailure(ws: WebSocket, t: Throwable, res: Response?) {
+            if (opened != null && !opened.isCompleted) opened.completeExceptionally(t)
             if (socket === ws) socket = null
             val detail = res?.let { response ->
                 val protocol = response.header("Sec-WebSocket-Protocol")?.let { ", protocol=${it}" }.orEmpty()
@@ -259,6 +275,9 @@ class ProxmoxConsole(
             onClosed(t.message)
         }
         override fun onClosed(ws: WebSocket, code: Int, reason: String) {
+            if (opened != null && !opened.isCompleted) {
+                opened.completeExceptionally(IllegalStateException("WebSocket zatvoren prije povezivanja (code $code): $reason"))
+            }
             if (socket === ws) socket = null
             onClosed(reason.ifBlank { "WebSocket zatvoren (code $code)" })
         }
