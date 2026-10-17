@@ -1268,7 +1268,7 @@ private fun Dashboard(
                     FilterChip(selected = resourceTypeFilter == "lxc", onClick = { resourceTypeFilter = "lxc" }, label = { Text("LXC (${vms.count { it.type.equals("lxc", true) }})") })
                 }
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = resourceStatusFilter == "all", onClick = { resourceStatusFilter = "all" }, label = { Text("Svi statusi (\${vms.size})") })
+                    FilterChip(selected = resourceStatusFilter == "all", onClick = { resourceStatusFilter = "all" }, label = { Text("Svi statusi (${vms.size})") })
                     FilterChip(selected = resourceStatusFilter == "running", onClick = { resourceStatusFilter = "running" }, label = { Text("Pokrenute ($runningGuestCount)") })
                     FilterChip(selected = resourceStatusFilter == "stopped", onClick = { resourceStatusFilter = "stopped" }, label = { Text("Zaustavljene ($stoppedGuestCount)") })
                 }
