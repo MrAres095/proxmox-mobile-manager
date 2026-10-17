@@ -762,6 +762,8 @@ private fun Dashboard(
     var createGuestBridge by remember { mutableStateOf("vmbr0") }
     var createGuestTemplate by remember { mutableStateOf("") }
     var createGuestPassword by remember { mutableStateOf("") }
+    var lxcTemplates by remember { mutableStateOf<List<String>>(emptyList()) }
+    var lxcTemplatesLoading by remember { mutableStateOf(false) }
     var createGuestBusy by remember { mutableStateOf(false) }
     var deleteGuestVm by remember { mutableStateOf<ProxmoxVm?>(null) }
     var deleteGuestConfirmation by remember { mutableStateOf("") }
@@ -1235,82 +1237,97 @@ private fun Dashboard(
 
             if (selectedTab == "guests") {
             item {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text("GUESTOVI", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                        Text("Guestovi", style = MaterialTheme.typography.headlineSmall)
-                    }
-                    Surface(shape = CircleShape, color = androidx.compose.ui.graphics.Color(0xFF17343B)) {
-                        Text("${vms.size}", modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
-                    }
-                    IconButton(
-                        onClick = {
-                            createGuestNode = nodes.firstOrNull { it.status.equals("online", true) }?.node ?: nodes.firstOrNull()?.node.orEmpty()
-                            createGuestStorage = storage.firstOrNull { it.active && it.enabled && it.node == createGuestNode && (it.content.contains("images") || it.content.contains("rootdir")) }?.storage
-                                ?: storage.firstOrNull { it.active && it.enabled }?.storage.orEmpty()
-                            createGuestOpen = true
-                        },
-                        enabled = nodes.any { it.status.equals("online", true) } && storage.any { it.active && it.enabled }
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "Kreiraj novi VM ili LXC")
-                    }
-                }
-                Spacer(Modifier.height(4.dp))
-                OutlinedTextField(
-                    value = resourceQuery,
-                    onValueChange = { resourceQuery = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = { Text("Traži guestove") },
-                    placeholder = { Text("Naziv, VMID ili node") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    trailingIcon = { if (resourceQuery.isNotEmpty()) IconButton(onClick = { resourceQuery = "" }) { Icon(Icons.Default.Close, contentDescription = "Očisti pretragu") } }
-                )
-                Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = resourceTypeFilter == "all", onClick = { resourceTypeFilter = "all" }, label = { Text("VM + LXC (${vms.size})") })
-                    FilterChip(selected = resourceTypeFilter == "vm", onClick = { resourceTypeFilter = "vm" }, label = { Text("Virtualne mašine (${vms.count { it.type.equals("qemu", true) || it.type.equals("vm", true) }})") })
-                    FilterChip(selected = resourceTypeFilter == "lxc", onClick = { resourceTypeFilter = "lxc" }, label = { Text("LXC (${vms.count { it.type.equals("lxc", true) }})") })
-                }
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = resourceStatusFilter == "all", onClick = { resourceStatusFilter = "all" }, label = { Text("Svi statusi (${vms.size})") })
-                    FilterChip(selected = resourceStatusFilter == "running", onClick = { resourceStatusFilter = "running" }, label = { Text("Pokrenute ($runningGuestCount)") })
-                    FilterChip(selected = resourceStatusFilter == "stopped", onClick = { resourceStatusFilter = "stopped" }, label = { Text("Zaustavljene ($stoppedGuestCount)") })
-                }
-                if (hasActiveResourceFilters) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = {
-                            resourceQuery = ""
-                            resourceStatusFilter = "all"
-                            resourceTypeFilter = "all"
-                        }) {
-                            Icon(Icons.Default.FilterAltOff, contentDescription = null)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Očisti filtre")
+                if (selectedGuestVmid == null) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text("GUESTOVI", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                            Text("Guestovi", style = MaterialTheme.typography.headlineSmall)
+                        }
+                        Surface(shape = CircleShape, color = androidx.compose.ui.graphics.Color(0xFF17343B)) {
+                            Text("${vms.size}", modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
+                        }
+                        IconButton(
+                            onClick = {
+                                createGuestNode = nodes.firstOrNull { it.status.equals("online", true) }?.node ?: nodes.firstOrNull()?.node.orEmpty()
+                                createGuestStorage = storage.firstOrNull { it.active && it.enabled && it.node == createGuestNode && (it.content.contains("images") || it.content.contains("rootdir")) }?.storage
+                                    ?: storage.firstOrNull { it.active && it.enabled }?.storage.orEmpty()
+                                createGuestOpen = true
+                            },
+                            enabled = nodes.any { it.status.equals("online", true) } && storage.any { it.active && it.enabled }
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Kreiraj novi VM ili LXC")
                         }
                     }
-                }
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Sortiranje", style = MaterialTheme.typography.labelLarge)
-                    Spacer(Modifier.width(8.dp))
-                    Box {
-                        TextButton(onClick = { sortMenuExpanded = true }) {
-                            Text(when (resourceSort) { "name" -> "Naziv"; "cpu" -> "Najveći CPU"; "memory" -> "Najviše RAM-a"; "vmid" -> "VMID"; else -> "Node / VMID" })
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                        }
-                        DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { sortMenuExpanded = false }) {
-                            listOf("node" to "Node / VMID", "name" to "Naziv", "vmid" to "VMID", "cpu" to "Najveći CPU", "memory" to "Najviše RAM-a").forEach { (value, label) ->
-                                DropdownMenuItem(text = { Text(label) }, onClick = { resourceSort = value; sortMenuExpanded = false })
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = resourceQuery,
+                        onValueChange = { resourceQuery = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Traži guestove") },
+                        placeholder = { Text("Naziv, VMID ili node") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        trailingIcon = { if (resourceQuery.isNotEmpty()) IconButton(onClick = { resourceQuery = "" }) { Icon(Icons.Default.Close, contentDescription = "Očisti pretragu") } }
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = resourceTypeFilter == "all", onClick = { resourceTypeFilter = "all" }, label = { Text("VM + LXC (${vms.size})") })
+                        FilterChip(selected = resourceTypeFilter == "vm", onClick = { resourceTypeFilter = "vm" }, label = { Text("Virtualne mašine (${vms.count { it.type.equals("qemu", true) || it.type.equals("vm", true) }})") })
+                        FilterChip(selected = resourceTypeFilter == "lxc", onClick = { resourceTypeFilter = "lxc" }, label = { Text("LXC (${vms.count { it.type.equals("lxc", true) }})") })
+                    }
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = resourceStatusFilter == "all", onClick = { resourceStatusFilter = "all" }, label = { Text("Svi statusi (${vms.size})") })
+                        FilterChip(selected = resourceStatusFilter == "running", onClick = { resourceStatusFilter = "running" }, label = { Text("Pokrenute ($runningGuestCount)") })
+                        FilterChip(selected = resourceStatusFilter == "stopped", onClick = { resourceStatusFilter = "stopped" }, label = { Text("Zaustavljene ($stoppedGuestCount)") })
+                    }
+                    if (hasActiveResourceFilters) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = {
+                                resourceQuery = ""
+                                resourceStatusFilter = "all"
+                                resourceTypeFilter = "all"
+                            }) {
+                                Icon(Icons.Default.FilterAltOff, contentDescription = null)
+                                Spacer(Modifier.width(6.dp))
+                                Text("Očisti filtre")
                             }
                         }
                     }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Sortiranje", style = MaterialTheme.typography.labelLarge)
+                        Spacer(Modifier.width(8.dp))
+                        Box {
+                            TextButton(onClick = { sortMenuExpanded = true }) {
+                                Text(when (resourceSort) { "name" -> "Naziv"; "cpu" -> "Najveći CPU"; "memory" -> "Najviše RAM-a"; "vmid" -> "VMID"; else -> "Node / VMID" })
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                            }
+                            DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { sortMenuExpanded = false }) {
+                                listOf("node" to "Node / VMID", "name" to "Naziv", "vmid" to "VMID", "cpu" to "Najveći CPU", "memory" to "Najviše RAM-a").forEach { (value, label) ->
+                                    DropdownMenuItem(text = { Text(label) }, onClick = { resourceSort = value; sortMenuExpanded = false })
+                                }
+                            }
+                        }
+                    }
+                    if (filteredVms.size != vms.size) Text("Prikazano ${filteredVms.size} od ${vms.size}", style = MaterialTheme.typography.bodySmall)
+                } else {
+                    val openedGuest = vms.firstOrNull { it.vmid == selectedGuestVmid }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(onClick = { selectedGuestVmid = null }, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Natrag na Guestove")
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(openedGuest?.name ?: "Guest VMID $selectedGuestVmid", style = MaterialTheme.typography.headlineSmall)
+                    Text("${openedGuest?.type?.uppercase().orEmpty()} • VMID $selectedGuestVmid • ${openedGuest?.node.orEmpty()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (filteredVms.size != vms.size) Text("Prikazano ${filteredVms.size} od ${vms.size}", style = MaterialTheme.typography.bodySmall)
             }
             if (vmLoading && vms.isEmpty()) {
                 item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() } }
             }
-            orderedVms.groupBy { it.node }.forEach { (nodeName, nodeVms) ->
+            val visibleVms = if (selectedGuestVmid == null) orderedVms else orderedVms.filter { it.vmid == selectedGuestVmid }
+            visibleVms.groupBy { it.node }.forEach { (nodeName, nodeVms) ->
                 item(key = "resource-node-$nodeName") {
                     Row(
                         Modifier.fillMaxWidth().padding(top = 5.dp, bottom = 1.dp),
