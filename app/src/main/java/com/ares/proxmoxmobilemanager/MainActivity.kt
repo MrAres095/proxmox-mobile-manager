@@ -1435,6 +1435,15 @@ private fun Dashboard(
                             detailsIpLoading = false
                         }
                     }
+                }, onExecuteCommand = { selected, command ->
+                    scope.launch {
+                        actionMessage = "Izvršavam naredbu u ${selected.name}..."
+                        try {
+                            actionMessage = api.executeGuestCommand(base, connection, selected, command)
+                        } catch (e: Exception) {
+                            actionMessage = e.message ?: "Naredba nije uspjela."
+                        }
+                    }
                 })
                     }
                 } else {
