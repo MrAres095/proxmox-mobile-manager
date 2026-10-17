@@ -1449,7 +1449,7 @@ private fun Dashboard(
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
                             )
                             OutlinedButton(
-                                onClick = { scope.launch { refreshAll() } },
+                                onClick = onRefresh,
                                 enabled = !vmLoading
                             ) {
                                 Icon(Icons.Default.Refresh, contentDescription = null)
