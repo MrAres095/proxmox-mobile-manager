@@ -3244,9 +3244,12 @@ private fun VmCard(
     onFirewall: (ProxmoxVm) -> Unit,
     onClone: (ProxmoxVm) -> Unit,
     onMigrate: (ProxmoxVm) -> Unit,
-    onDetails: (ProxmoxVm) -> Unit
+    onDetails: (ProxmoxVm) -> Unit,
+    onExecuteCommand: (ProxmoxVm, String) -> Unit = { _, _ -> }
 ) {
     var confirmAction by remember { mutableStateOf<VmAction?>(null) }
+    var showCommandDialog by remember { mutableStateOf(false) }
+    var guestCommand by remember { mutableStateOf("")
     var showSnapshot by remember { mutableStateOf(false) }
     var snapshotName by remember { mutableStateOf("") }
     var snapshotDescription by remember { mutableStateOf("") }
@@ -3308,6 +3311,15 @@ private fun VmCard(
                 OutlinedButton({ onConsole(vm) }, enabled = !busy, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Terminal, null); Spacer(Modifier.width(4.dp)); Text("Konzola") }
                 OutlinedButton({ onDetails(vm) }, enabled = !busy, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Tune, null); Spacer(Modifier.width(4.dp)); Text("Konfiguracija") }
             }
+            OutlinedButton(
+                onClick = { guestCommand = ""; showCommandDialog = true },
+                enabled = !busy && vm.isRunning,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Terminal, null)
+                Spacer(Modifier.width(6.dp))
+                Text(if (vm.isQemu) "Izvrši naredbu (Guest Agent)" else "Izvrši naredbu u LXC-u")
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton({ onEditConfig(vm) }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Uredi") }
                 OutlinedButton({ onSnapshots(vm) }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Snapshoti") }
@@ -3364,6 +3376,42 @@ private fun VmCard(
             }
         }
     }
+    if (showCommandDialog) {
+        AlertDialog(
+            onDismissRequest = { showCommandDialog = false },
+            title = { Text("Naredba u " + vm.name) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        if (vm.isQemu) "Za VM mora biti instaliran i uključen QEMU Guest Agent. Naredba se izvršava unutar gostujućeg OS-a."
+                        else "Naredba se izvršava unutar LXC kontejnera.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    OutlinedTextField(
+                        value = guestCommand,
+                        onValueChange = { guestCommand = it.take(4000) },
+                        label = { Text("Shell naredba") },
+                        placeholder = { Text("apt update") },
+                        minLines = 2,
+                        maxLines = 5,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = guestCommand.isNotBlank() && !busy,
+                    onClick = {
+                        val command = guestCommand.trim()
+                        showCommandDialog = false
+                        onExecuteCommand(vm, command)
+                    }
+                ) { Text("Izvrši") }
+            },
+            dismissButton = { TextButton(onClick = { showCommandDialog = false }) { Text("Odustani") } }
+        )
+    }
+
     if (showSnapshot) {
         AlertDialog(
             onDismissRequest = { if (!busy) showSnapshot = false },
