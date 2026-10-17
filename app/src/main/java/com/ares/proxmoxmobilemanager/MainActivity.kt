@@ -1249,8 +1249,11 @@ private fun Dashboard(
                         IconButton(
                             onClick = {
                                 createGuestNode = nodes.firstOrNull { it.status.equals("online", true) }?.node ?: nodes.firstOrNull()?.node.orEmpty()
-                                createGuestStorage = storage.firstOrNull { it.active && it.enabled && it.node == createGuestNode && (it.content.contains("images") || it.content.contains("rootdir")) }?.storage
-                                    ?: storage.firstOrNull { it.active && it.enabled }?.storage.orEmpty()
+                                createGuestId = ((vms.maxOfOrNull { it.vmid } ?: 99) + 1).toString()
+                                createGuestStorage = storage.firstOrNull { it.active && it.enabled && it.node == createGuestNode && it.content.contains("images") }?.storage
+                                    ?: storage.firstOrNull { it.active && it.enabled && it.node == createGuestNode && it.content.contains("rootdir") }?.storage
+                                    ?: storage.firstOrNull { it.active && it.enabled && it.node == createGuestNode }?.storage.orEmpty()
+                                lxcTemplates = emptyList()
                                 createGuestOpen = true
                             },
                             enabled = nodes.any { it.status.equals("online", true) } && storage.any { it.active && it.enabled }
@@ -2109,11 +2112,53 @@ private fun Dashboard(
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(value = createGuestDisk, onValueChange = { createGuestDisk = it.filter(Char::isDigit).take(5) }, label = { Text("Disk (GB)") }, singleLine = true, modifier = Modifier.weight(1f), enabled = !createGuestBusy)
-                        OutlinedTextField(value = createGuestStorage, onValueChange = { createGuestStorage = it.take(80) }, label = { Text("Storage") }, supportingText = { Text("Dostupni: " + storage.filter { it.active && it.enabled }.map { it.storage }.distinct().joinToString()) }, singleLine = true, modifier = Modifier.weight(1f), enabled = !createGuestBusy)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Storage", style = MaterialTheme.typography.labelMedium)
+                            val eligibleStorage = storage.filter { it.active && it.enabled && it.node == createGuestNode && (if (createGuestKind == "lxc") it.content.contains("rootdir") else it.content.contains("images")) }
+                            if (eligibleStorage.isEmpty()) {
+                                Text("Nema aktivnog storagea za ${if (createGuestKind == "lxc") "LXC rootdir" else "VM images"} na ovom nodeu.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                                storage.filter { it.active && it.enabled && it.node == createGuestNode }.forEach { item ->
+                                    FilterChip(selected = createGuestStorage == item.storage, onClick = { createGuestStorage = item.storage }, label = { Text("${item.storage} (${item.type})") }, enabled = !createGuestBusy)
+                                }
+                            } else {
+                                eligibleStorage.forEach { item ->
+                                    FilterChip(selected = createGuestStorage == item.storage, onClick = { createGuestStorage = item.storage }, label = { Text("${item.storage} (${item.type})") }, enabled = !createGuestBusy)
+                                }
+                            }
+                        }
                     }
                     OutlinedTextField(value = createGuestBridge, onValueChange = { createGuestBridge = it.take(80) }, label = { Text("Mrežni bridge") }, supportingText = { Text("Najčešće vmbr0") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !createGuestBusy)
                     if (createGuestKind == "lxc") {
-                        OutlinedTextField(value = createGuestTemplate, onValueChange = { createGuestTemplate = it.take(240) }, label = { Text("LXC template") }, placeholder = { Text("local:vztmpl/debian-12-standard_*.tar.zst") }, supportingText = { Text("Mora već postojati na Proxmox storageu.") }, modifier = Modifier.fillMaxWidth(), enabled = !createGuestBusy)
+                        OutlinedTextField(value = createGuestTemplate, onValueChange = { createGuestTemplate = it.take(240) }, label = { Text("LXC template (volid)") }, placeholder = { Text("local:vztmpl/debian-13-standard_*.tar.zst") }, supportingText = { Text("Učitaj predloške s odabranog nodea/storagea ili unesi postojeći volid.") }, modifier = Modifier.fillMaxWidth(), enabled = !createGuestBusy)
+                        OutlinedButton(
+                            onClick = {
+                                lxcTemplatesLoading = true
+                                scope.launch {
+                                    try {
+                                        lxcTemplates = api.getLxcTemplates(base, connection, createGuestNode.trim(), createGuestStorage.trim())
+                                        if (lxcTemplates.isEmpty()) actionMessage = "Nema LXC templateova na storageu $createGuestStorage. Preuzmi template u Proxmoxu ili odaberi storage koji podržava sadržaj VZTemplate."
+                                        else if (createGuestTemplate.isBlank()) createGuestTemplate = lxcTemplates.first()
+                                    } catch (e: Exception) {
+                                        actionMessage = e.message ?: "Nije moguće učitati LXC templateove."
+                                    } finally { lxcTemplatesLoading = false }
+                                }
+                            },
+                            enabled = !createGuestBusy && !lxcTemplatesLoading && createGuestNode.isNotBlank() && createGuestStorage.isNotBlank(),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (lxcTemplatesLoading) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            else Icon(Icons.Default.Download, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(if (lxcTemplatesLoading) "Učitavam predloške..." else "Učitaj dostupne LXC predloške")
+                        }
+                        lxcTemplates.forEach { template ->
+                            FilterChip(
+                                selected = createGuestTemplate == template,
+                                onClick = { createGuestTemplate = template },
+                                label = { Text(template.substringAfter("vztmpl/"), maxLines = 1) },
+                                enabled = !createGuestBusy
+                            )
+                        }
                         OutlinedTextField(value = createGuestPassword, onValueChange = { createGuestPassword = it }, label = { Text("Root lozinka za LXC") }, supportingText = { Text("Najmanje 8 znakova") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !createGuestBusy)
                     } else {
                         Text("VM će dobiti prazan disk. Prije prvog pokretanja dodaj instalacijski ISO kroz Proxmox ili konfiguraciju VM-a.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
