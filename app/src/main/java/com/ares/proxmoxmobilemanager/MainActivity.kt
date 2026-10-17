@@ -3258,7 +3258,7 @@ private fun VmCard(
 ) {
     var confirmAction by remember { mutableStateOf<VmAction?>(null) }
     var showCommandDialog by remember { mutableStateOf(false) }
-    var guestCommand by remember { mutableStateOf("")
+    var guestCommand by remember { mutableStateOf("") }
     var showSnapshot by remember { mutableStateOf(false) }
     var snapshotName by remember { mutableStateOf("") }
     var snapshotDescription by remember { mutableStateOf("") }
