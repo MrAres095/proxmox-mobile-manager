@@ -1428,8 +1428,70 @@ private fun Dashboard(
                 }
                 }
                 }
-            if (!vmLoading && vms.isEmpty()) item { Text("Nema pronađenih guestova (VM/LXC).") }
-            else if (!vmLoading && filteredVms.isEmpty()) item { Text("Nijedan guest ne odgovara pretrazi i odabranom filtru.") }
+            if (!vmLoading && vms.isEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.extraLarge,
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 28.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(9.dp)
+                        ) {
+                            Icon(Icons.Default.Dns, contentDescription = null, modifier = Modifier.size(38.dp), tint = MaterialTheme.colorScheme.primary)
+                            Text("Još nema guestova", style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                            Text(
+                                "Proxmox nije vratio nijedan VM ili LXC. Osvježi popis ili provjeri vezu i dozvole na serveru.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                            OutlinedButton(
+                                onClick = { scope.launch { refreshAll() } },
+                                enabled = !vmLoading
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null)
+                                Spacer(Modifier.width(7.dp))
+                                Text("Osvježi popis")
+                            }
+                        }
+                    }
+                }
+            } else if (!vmLoading && filteredVms.isEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.extraLarge,
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(9.dp)
+                        ) {
+                            Icon(Icons.Default.FilterAltOff, contentDescription = null, modifier = Modifier.size(34.dp), tint = MaterialTheme.colorScheme.secondary)
+                            Text("Nema rezultata", style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                            Text(
+                                "Nijedan guest ne odgovara pretrazi i odabranim filtrima. Pokušaj promijeniti kriterije ili ih očisti.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                            OutlinedButton(onClick = {
+                                resourceQuery = ""
+                                resourceStatusFilter = "all"
+                                resourceTypeFilter = "all"
+                            }) {
+                                Icon(Icons.Default.FilterAltOff, contentDescription = null)
+                                Spacer(Modifier.width(7.dp))
+                                Text("Očisti filtre")
+                            }
+                        }
+                    }
+                }
+            }
 
             }
 
