@@ -489,6 +489,64 @@ class ProxmoxApi {
     /**
      * Reads guest IP addresses. QEMU uses the QEMU guest agent; LXC uses the Proxmox interfaces endpoint.
      */
+    /**
+     * Runs an in-guest command through Proxmox's QEMU guest agent or LXC exec API.
+     * QEMU requires the guest agent to be installed and enabled in the VM.
+     */
+    suspend fun executeGuestCommand(
+        base: String,
+        connection: ProxmoxConnection,
+        vm: ProxmoxVm,
+        command: String
+    ): String = withContext(Dispatchers.IO) {
+        require(vm.isRunning) { "Guest mora biti pokrenut." }
+        require(command.isNotBlank()) { "Naredba ne smije biti prazna." }
+        require(command.length <= 4000) { "Naredba je predugačka (maksimalno 4000 znakova)." }
+
+        val node = URLEncoder.encode(vm.node, "UTF-8")
+        val endpoint = if (vm.isQemu) "qemu" else "lxc"
+        val encodedCommand = URLEncoder.encode(command, "UTF-8")
+        val path = if (vm.isQemu) {
+            "/api2/json/nodes/$node/qemu/${vm.vmid}/agent/exec"
+        } else {
+            "/api2/json/nodes/$node/lxc/${vm.vmid}/exec"
+        }
+        val response = requestWrite(
+            base, path, connection, "POST", 15000,
+            "command=" + URLEncoder.encode("/bin/sh", "UTF-8") +
+                "&command=" + URLEncoder.encode("-lc", "UTF-8") +
+                "&command=$encodedCommand"
+        )
+        val data = response.optJSONObject("data")
+        val pid = data?.optInt("pid", -1) ?: -1
+        if (vm.isQemu) {
+            require(pid > 0) { "Proxmox nije vratio PID. Provjeri je li QEMU Guest Agent instaliran i uključen u VM konfiguraciji." }
+            // QEMU agent exec returns asynchronously; poll for completion and output.
+            var last = ""
+            repeat(15) {
+                delay(1000)
+                val poll = request(
+                    base,
+                    "/api2/json/nodes/$node/qemu/${vm.vmid}/agent/exec-status?pid=$pid",
+                    connection, 8000
+                )
+                val result = poll.optJSONObject("data") ?: JSONObject()
+                last = result.optString("out-data") + result.optString("err-data")
+                if (result.optBoolean("exited")) {
+                    val code = result.optInt("exitcode", 0)
+                    return@withContext "Exit code: $code\n" + last.ifBlank { "(nema izlaznog teksta)" }
+                }
+            }
+            "Naredba je pokrenuta, ali rezultat još nije stigao. PID: $pid\n$last"
+        } else {
+            val upid = response.optJSONObject("data")?.optString("upid").orEmpty()
+            if (upid.isBlank()) response.toString() else {
+                val task = runTaskAndWait(base, connection, vm.node, response)
+                "LXC exec zadatak završen.\n$task"
+            }
+        }
+    }
+
     suspend fun getGuestIpAddresses(base: String, connection: ProxmoxConnection, vm: ProxmoxVm): List<String> =
         withContext(Dispatchers.IO) {
             if (!vm.isRunning) return@withContext emptyList()
