@@ -622,18 +622,74 @@ class ProxmoxApi {
 
     suspend fun getStorage(base: String, connection: ProxmoxConnection): List<ProxmoxStorage> =
         withContext(Dispatchers.IO) {
-            val result = mutableListOf<ProxmoxStorage>()
-            for (node in getNodes(base, connection)) {
+            val nodeList = getNodes(base, connection)
+            val byNodeAndStorage = linkedMapOf<Pair<String, String>, ProxmoxStorage>()
+
+            // Runtime endpoint supplies active/usage information for each node.
+            for (node in nodeList) {
                 try {
-                    val json = request(base, "/api2/json/nodes/${node.node}/storage", connection, 7000)
+                    val json = request(base, "/api2/json/nodes/${URLEncoder.encode(node.node, "UTF-8")}/storage", connection, 7000)
                     val data = json.optJSONArray("data") ?: continue
                     for (i in 0 until data.length()) {
                         val item = data.getJSONObject(i)
-                        result += ProxmoxStorage(node.node, item.optString("storage"), item.optString("type"), item.optString("content"), item.optBoolean("active"), item.optBoolean("enabled"), item.optLong("total"), item.optLong("used"), item.optLong("avail"))
+                        val id = item.optString("storage")
+                        if (id.isBlank()) continue
+                        byNodeAndStorage[node.node to id] = ProxmoxStorage(
+                            node.node, id, item.optString("type"), item.optString("content"),
+                            item.optBoolean("active"), item.optBoolean("enabled"),
+                            item.optLong("total"), item.optLong("used"), item.optLong("avail")
+                        )
                     }
                 } catch (_: Exception) { }
             }
-            result
+
+            // The cluster-wide config endpoint is a fallback for storage types (including ZFS)
+            // that may be omitted from a node's runtime response.
+            try {
+                val json = request(base, "/api2/json/storage", connection, 7000)
+                val data = json.optJSONArray("data")
+                if (data != null) {
+                    for (i in 0 until data.length()) {
+                        val item = data.getJSONObject(i)
+                        val id = item.optString("storage")
+                        if (id.isBlank()) continue
+                        val type = item.optString("type")
+                        val content = item.optString("content")
+                        val allowedNodes = item.optString("nodes")
+                            .split(',').map { it.trim() }.filter { it.isNotBlank() }
+                        val targetNodes = if (allowedNodes.isEmpty()) nodeList.map { it.node } else allowedNodes
+                        for (nodeName in targetNodes) {
+                            val key = nodeName to id
+                            val existing = byNodeAndStorage[key]
+                            if (existing != null) {
+                                byNodeAndStorage[key] = existing.copy(
+                                    type = type.ifBlank { existing.type },
+                                    content = content.ifBlank { existing.content },
+                                    enabled = item.optBoolean("disable", false).not() && existing.enabled
+                                )
+                            } else {
+                                byNodeAndStorage[key] = ProxmoxStorage(
+                                    nodeName, id, type, content,
+                                    active = false,
+                                    enabled = !item.optBoolean("disable", false),
+                                    total = 0L, used = 0L, avail = 0L
+                                )
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) { }
+
+            byNodeAndStorage.values.toList()
+        }
+
+    suspend fun getLxcTemplates(base: String, connection: ProxmoxConnection, node: String, storage: String): List<String> =
+        withContext(Dispatchers.IO) {
+            val path = "/api2/json/nodes/${URLEncoder.encode(node, "UTF-8")}/storage/${URLEncoder.encode(storage, "UTF-8")}/content?content=vztmpl"
+            val data = request(base, path, connection, 8000).optJSONArray("data") ?: return@withContext emptyList()
+            (0 until data.length()).mapNotNull { index ->
+                data.optJSONObject(index)?.optString("volid")?.takeIf { !it.isNullOrBlank() }
+            }.distinct().sorted()
         }
 
     suspend fun createSnapshot(base: String, connection: ProxmoxConnection, vm: ProxmoxVm, snapName: String, description: String = "") {
