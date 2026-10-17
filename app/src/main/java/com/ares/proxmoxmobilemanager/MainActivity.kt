@@ -804,6 +804,7 @@ private fun Dashboard(
     var resourceStatusFilter by remember { mutableStateOf("all") }
     var resourceTypeFilter by remember { mutableStateOf("all") }
     var resourceSort by remember { mutableStateOf("node") }
+    val hasActiveResourceFilters = resourceQuery.isNotBlank() || resourceStatusFilter != "all" || resourceTypeFilter != "all"
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var storageQuery by remember { mutableStateOf("") }
     var storageStatusFilter by remember { mutableStateOf("all") }
@@ -1268,6 +1269,19 @@ private fun Dashboard(
                     FilterChip(selected = resourceStatusFilter == "all", onClick = { resourceStatusFilter = "all" }, label = { Text("Svi statusi") })
                     FilterChip(selected = resourceStatusFilter == "running", onClick = { resourceStatusFilter = "running" }, label = { Text("Pokrenute") })
                     FilterChip(selected = resourceStatusFilter == "stopped", onClick = { resourceStatusFilter = "stopped" }, label = { Text("Zaustavljene") })
+                }
+                if (hasActiveResourceFilters) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = {
+                            resourceQuery = ""
+                            resourceStatusFilter = "all"
+                            resourceTypeFilter = "all"
+                        }) {
+                            Icon(Icons.Default.FilterAltOff, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Očisti filtre")
+                        }
+                    }
                 }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("Sortiranje", style = MaterialTheme.typography.labelLarge)
