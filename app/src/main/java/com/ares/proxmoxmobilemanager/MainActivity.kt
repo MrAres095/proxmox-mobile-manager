@@ -811,6 +811,11 @@ private fun Dashboard(
     var storageQuery by remember { mutableStateOf("") }
     var storageStatusFilter by remember { mutableStateOf("all") }
     var storageTypeFilter by remember { mutableStateOf("all") }
+    val hasActiveStorageFilters = storageQuery.isNotBlank() || storageStatusFilter != "all" || storageTypeFilter != "all"
+    val activeStorageCount = storage.count { it.active }
+    val inactiveStorageCount = storage.size - activeStorageCount
+    val localStorageCount = storage.count { it.type.lowercase() in setOf("dir", "lvm", "lvmthin", "btrfs") }
+    val zfsStorageCount = storage.count { it.type.contains("zfs", ignoreCase = true) }
     var selectedTab by remember { mutableStateOf("overview") }
     val filteredVms = vms.filter { vm ->
         val query = resourceQuery.trim()
@@ -1660,13 +1665,26 @@ private fun Dashboard(
                 )
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = storageTypeFilter == "all", onClick = { storageTypeFilter = "all" }, label = { Text("Svi diskovi (${storage.size})") })
-                    FilterChip(selected = storageTypeFilter == "local", onClick = { storageTypeFilter = "local" }, label = { Text("Lokalni") })
-                    FilterChip(selected = storageTypeFilter == "zfs", onClick = { storageTypeFilter = "zfs" }, label = { Text("ZFS") })
+                    FilterChip(selected = storageTypeFilter == "local", onClick = { storageTypeFilter = "local" }, label = { Text("Lokalni ($localStorageCount)") })
+                    FilterChip(selected = storageTypeFilter == "zfs", onClick = { storageTypeFilter = "zfs" }, label = { Text("ZFS ($zfsStorageCount)") })
                 }
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = storageStatusFilter == "all", onClick = { storageStatusFilter = "all" }, label = { Text("Svi statusi") })
-                    FilterChip(selected = storageStatusFilter == "active", onClick = { storageStatusFilter = "active" }, label = { Text("Aktivni") })
-                    FilterChip(selected = storageStatusFilter == "inactive", onClick = { storageStatusFilter = "inactive" }, label = { Text("Neaktivni") })
+                    FilterChip(selected = storageStatusFilter == "all", onClick = { storageStatusFilter = "all" }, label = { Text("Svi statusi (${storage.size})") })
+                    FilterChip(selected = storageStatusFilter == "active", onClick = { storageStatusFilter = "active" }, label = { Text("Aktivni ($activeStorageCount)") })
+                    FilterChip(selected = storageStatusFilter == "inactive", onClick = { storageStatusFilter = "inactive" }, label = { Text("Neaktivni ($inactiveStorageCount)") })
+                }
+                if (hasActiveStorageFilters) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = {
+                            storageQuery = ""
+                            storageStatusFilter = "all"
+                            storageTypeFilter = "all"
+                        }) {
+                            Icon(Icons.Default.FilterAltOff, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Očisti filtre")
+                        }
+                    }
                 }
                 Text("Prikazano: ${filteredStorage.size} / ${storage.size}", style = MaterialTheme.typography.bodySmall)
             }
