@@ -1358,11 +1358,6 @@ private fun Dashboard(
                 items(typedVms, key = { it.node + "-" + it.type + "-" + it.vmid }) { vm ->
                 if (selectedGuestVmid == vm.vmid) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { selectedGuestVmid = null }, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Natrag na Guestove")
-                        }
                         VmCard(vm, vmLoading, onVmAction, onConsole, onSnapshot, onDelete = { selected -> deleteGuestVm = selected; deleteGuestConfirmation = "" }, onEditConfig = { selected ->
                     editVm = selected
                 }, onSnapshots = { selected ->
@@ -2100,8 +2095,18 @@ private fun Dashboard(
                 ) {
                     Text("Vrsta resursa", style = MaterialTheme.typography.labelLarge)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(selected = createGuestKind == "qemu", onClick = { createGuestKind = "qemu" }, label = { Text("QEMU VM") }, enabled = !createGuestBusy)
-                        FilterChip(selected = createGuestKind == "lxc", onClick = { createGuestKind = "lxc" }, label = { Text("LXC container") }, enabled = !createGuestBusy)
+                        FilterChip(selected = createGuestKind == "qemu", onClick = {
+                            createGuestKind = "qemu"
+                            lxcTemplates = emptyList()
+                            createGuestStorage = storage.firstOrNull { it.active && it.enabled && it.node == createGuestNode && it.content.contains("images") }?.storage
+                                ?: storage.firstOrNull { it.active && it.enabled && it.node == createGuestNode }?.storage.orEmpty()
+                        }, label = { Text("QEMU VM") }, enabled = !createGuestBusy)
+                        FilterChip(selected = createGuestKind == "lxc", onClick = {
+                            createGuestKind = "lxc"
+                            lxcTemplates = emptyList()
+                            createGuestStorage = storage.firstOrNull { it.active && it.enabled && it.node == createGuestNode && it.content.contains("rootdir") }?.storage
+                                ?: storage.firstOrNull { it.active && it.enabled && it.node == createGuestNode }?.storage.orEmpty()
+                        }, label = { Text("LXC container") }, enabled = !createGuestBusy)
                     }
                     OutlinedTextField(value = createGuestNode, onValueChange = { createGuestNode = it }, label = { Text("Node") }, supportingText = { Text("Dostupni: " + nodes.filter { it.status.equals("online", true) }.joinToString { it.node }) }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !createGuestBusy)
                     OutlinedTextField(value = createGuestId, onValueChange = { createGuestId = it.filter(Char::isDigit).take(9) }, label = { Text("VMID") }, placeholder = { Text("npr. 120") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !createGuestBusy)
