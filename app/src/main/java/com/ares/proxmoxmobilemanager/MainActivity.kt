@@ -805,6 +805,8 @@ private fun Dashboard(
     var resourceTypeFilter by remember { mutableStateOf("all") }
     var resourceSort by remember { mutableStateOf("node") }
     val hasActiveResourceFilters = resourceQuery.isNotBlank() || resourceStatusFilter != "all" || resourceTypeFilter != "all"
+    val runningGuestCount = vms.count { it.status.equals("running", ignoreCase = true) }
+    val stoppedGuestCount = vms.size - runningGuestCount
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var storageQuery by remember { mutableStateOf("") }
     var storageStatusFilter by remember { mutableStateOf("all") }
@@ -1266,9 +1268,9 @@ private fun Dashboard(
                     FilterChip(selected = resourceTypeFilter == "lxc", onClick = { resourceTypeFilter = "lxc" }, label = { Text("LXC (${vms.count { it.type.equals("lxc", true) }})") })
                 }
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = resourceStatusFilter == "all", onClick = { resourceStatusFilter = "all" }, label = { Text("Svi statusi") })
-                    FilterChip(selected = resourceStatusFilter == "running", onClick = { resourceStatusFilter = "running" }, label = { Text("Pokrenute") })
-                    FilterChip(selected = resourceStatusFilter == "stopped", onClick = { resourceStatusFilter = "stopped" }, label = { Text("Zaustavljene") })
+                    FilterChip(selected = resourceStatusFilter == "all", onClick = { resourceStatusFilter = "all" }, label = { Text("Svi statusi (\${vms.size})") })
+                    FilterChip(selected = resourceStatusFilter == "running", onClick = { resourceStatusFilter = "running" }, label = { Text("Pokrenute ($runningGuestCount)") })
+                    FilterChip(selected = resourceStatusFilter == "stopped", onClick = { resourceStatusFilter = "stopped" }, label = { Text("Zaustavljene ($stoppedGuestCount)") })
                 }
                 if (hasActiveResourceFilters) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
