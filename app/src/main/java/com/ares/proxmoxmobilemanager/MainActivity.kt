@@ -2182,7 +2182,16 @@ private fun Dashboard(
             },
             confirmButton = {
                 TextButton(
-                    enabled = !createGuestBusy && createGuestId.toIntOrNull() != null && createGuestName.isNotBlank() && createGuestNode.isNotBlank() && createGuestStorage.isNotBlank() && createGuestCores.toIntOrNull() != null && createGuestMemory.toIntOrNull() != null && createGuestDisk.toIntOrNull() != null && createGuestBridge.isNotBlank() && (createGuestKind != "lxc" || (createGuestTemplate.isNotBlank() && createGuestPassword.length >= 8)),
+                    enabled = !createGuestBusy &&
+                        createGuestId.toIntOrNull()?.let { it in 100..999999999 } == true &&
+                        createGuestName.isNotBlank() &&
+                        createGuestNode.isNotBlank() &&
+                        createGuestStorage.isNotBlank() &&
+                        createGuestCores.toIntOrNull()?.let { it in 1..256 } == true &&
+                        createGuestMemory.toIntOrNull()?.let { it in 128..1048576 } == true &&
+                        createGuestDisk.toIntOrNull()?.let { it in 1..65536 } == true &&
+                        createGuestBridge.isNotBlank() &&
+                        (createGuestKind != "lxc" || (createGuestTemplate.isNotBlank() && createGuestPassword.length >= 8)),
                     onClick = {
                         createGuestBusy = true
                         scope.launch {
